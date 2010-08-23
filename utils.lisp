@@ -15,3 +15,34 @@
               (cons (make-keyword (string-upcase (first pair)))
                     (second pair))))
           (split "&" string)))
+
+
+;;; ----------------------------------------------------------------------
+;;; Default CL-WHO configuration
+;;; ----------------------------------------------------------------------
+(setf *escape-char-p*
+      #'(lambda (char)
+	  (find char "<>&'\"")))
+
+(setf (html-mode) :xml)
+
+;;; ----------------------------------------------------------------------
+;;; HTML macros
+;;; ----------------------------------------------------------------------
+(defmacro with-html (&body body)
+  `(progn
+     (with-html-output (*standard-output* nil :prologue nil :indent t)
+       ,@body)
+     ""))
+
+(defmacro with-page ((&rest html-params) &body body)
+  `(progn
+     (with-html-output (*standard-output* nil :prologue t :indent nil)
+       (:html ,@html-params
+	      ,@body))
+     nil))
+
+(defmacro html ((&rest args) &body body)
+  `(lambda (,@args)
+    (with-html
+      ,@body)))

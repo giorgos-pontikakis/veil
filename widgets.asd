@@ -13,5 +13,10 @@
 	       :metabang-bind)
   :components ((:file "package")
                (:file "utils")
-	       (:file "forms")))
+               (:file "webapps") 
+               (:file "pages")
+	       (:file "parameters")
+               (:file "db")
+               (:file "forms")
+               (:file "example")))
 
