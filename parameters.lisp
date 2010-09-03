@@ -31,10 +31,13 @@
 ;; lisp to html
 
 (defmethod lisp->html ((value t))
-  (if (null value) +html-false+ +html-true+))
+  +html-true+)
 
 (defmethod lisp->html ((value (eql :null)))
   +html-null+)
+
+(defmethod lisp->html ((value (eql nil)))
+  +html-false+)
 
 (defmethod lisp->html ((value integer))
   (format nil "~A" value))
