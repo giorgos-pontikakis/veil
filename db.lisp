@@ -1,11 +1,11 @@
 (in-package :widgets)
 
 (defclass db-mixin ()
-  ((host     :accessor host     :initarg :host)
-   (username :accessor username :initarg :username)
-   (password :accessor password :initarg :password) 
-   (adapter  :accessor adapter  :initarg :adapter)
-   (dbname   :accessor dbname   :initarg :dbname)))
+  ((dbname  :accessor dbname  :initarg :dbname)
+   (dbhost  :accessor dbhost  :initarg :dbhost)
+   (dbuser  :accessor dbuser  :initarg :dbuser)
+   (dbpass  :accessor dbpass  :initarg :dbpass) 
+   (adapter :accessor adapter :initarg :adapter)))
 
 (defclass webapp-db (webapp db)
   ())
