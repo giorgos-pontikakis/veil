@@ -11,8 +11,9 @@
   ())
 
 (defmacro with-db (&body body)
-  `(with-connection (list (cfg :dbname) (cfg :dbuser) (cfg :dbpass) (cfg :dbhost)) 
-     ,@body))
+  `(with-webapp ()
+     (with-connection (list (dbname*webapp*) (dbuser *webapp*) (dbpass *webapp*) (dbhost *webapp*)) 
+       ,@body)))
 
 (defmacro select-dao-unique (type &optional (test t) &rest ordering)
   (with-gensyms (dao)

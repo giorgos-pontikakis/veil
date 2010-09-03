@@ -38,8 +38,9 @@
 
 (defun package-webapp ()
   "Return the webapp with name being the keyword of the current package name."
-  (find *webapps*
-        (make-keyword (package-name *package*)) :key #'name))
+  (let ((app (find *webapps*
+                   (make-keyword (package-name *package*)) :key #'name)))
+    (or app (error "No webapp loaded for the current package."))))
 
 (defun ensure-webapp (webapp-specifier)
   (if (symbolp webapp-specifier)
@@ -68,8 +69,8 @@
 
 ;; Note: The default Hunchentoot list-request-dispatcher contains a
 ;; list of functions with no indication of the page that they
-;; originated from. The only way to unpublish a page is to (1) delete
-;; the dispatch-table list, unregister the function, republish the
+;; originated from. The only way to unpublish a page is to delete the
+;; dispatch-table list, unregister the function, republish the
 ;; remaining functions and finally re-register the page (but without
 ;; re-publishing it).
 
@@ -89,3 +90,12 @@ the *dispatch-table* list."
             (return (funcall action)))
           (finally (setf (return-code* *reply*) +http-not-found+)))))
 
+
+
+;;; --- Macros ---
+
+(defmacro with-webapp ((&optional name) &body body)
+  (let ((*webapp* (or (ensure-webapp name)
+                      (webapp (package-webapp)))))
+    (declare (special *webapp*))
+    ,@body))
