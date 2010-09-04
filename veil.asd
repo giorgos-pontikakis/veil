@@ -2,7 +2,7 @@
 
 (in-package :cl)
 
-(asdf:defsystem :widgets
+(asdf:defsystem :veil
   :serial t
   :depends-on (:lisputils
 	       :hunchentoot
@@ -10,13 +10,13 @@
 	       :cl-ppcre 
 	       :iterate
                :alexandria
-	       :metabang-bind)
+	       :metabang-bind
+               :postmodern)
   :components ((:file "package")
                (:file "utils")
                (:file "webapps") 
                (:file "pages")
 	       (:file "parameters")
                (:file "db")
-               (:file "forms")
-               (:file "example")))
+               (:file "html")))
 

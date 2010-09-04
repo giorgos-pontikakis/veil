@@ -1,14 +1,15 @@
 (in-package :cl-user)
 
-(defpackage :widgets 
+(defpackage :veil
   (:use :common-lisp
-	:lisputils
-	:hunchentoot
+	:lisputils 
 	:cl-who
 	:cl-ppcre
 	:iterate
 	:alexandria
-	:metabang-bind) 
+	:metabang-bind
+        :postmodern) 
   (:export
+   :dynamic-page
    ))
 

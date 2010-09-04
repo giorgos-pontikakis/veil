@@ -1,4 +1,8 @@
-(in-package :widgets)
+(in-package :veil)
+
+
+
+;;; Class definitions
 
 (defclass db-mixin ()
   ((dbname  :accessor dbname  :initarg :dbname)
@@ -7,13 +11,16 @@
    (dbpass  :accessor dbpass  :initarg :dbpass) 
    (adapter :accessor adapter :initarg :adapter)))
 
-(defclass webapp-db (webapp db)
+(defclass webapp-db (webapp db-mixin)
   ())
 
+
+
+;;; Utilities
+
 (defmacro with-db (&body body)
-  `(with-webapp ()
-     (with-connection (list (dbname*webapp*) (dbuser *webapp*) (dbpass *webapp*) (dbhost *webapp*)) 
-       ,@body)))
+  `(with-connection (list (dbname *webapp*) (dbuser *webapp*) (dbpass *webapp*) (dbhost *webapp*)) 
+     ,@body))
 
 (defmacro select-dao-unique (type &optional (test t) &rest ordering)
   (with-gensyms (dao)

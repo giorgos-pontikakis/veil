@@ -1,4 +1,4 @@
-(in-package :widgets)
+(in-package :veil)
 
 (declaim (optimize (speed 0) (debug 3)))
 
@@ -122,6 +122,7 @@
 
 (defun bind-parameter! (p raw)
   (handler-case (let ((parsed (parse-raw raw (lisp-type p))))
+                  (break)
                   (cond
                     ;; parameter not supplied
                     ((null raw) 
@@ -159,13 +160,12 @@
                                                (parse-query-string query-string)))))
     ;; First, bind parameters and check with their own validators
     (iter (for p in (parameters page))
-          (for pair = (find (name p) query-alist :key #'first))
-          (for raw = (cdr pair)) 
+          (for raw = (cdr (assoc (name p) query-alist)))
           (bind-parameter! p raw))
     ;; Then, check again using the page validators
     (iter (for v in (validators page))
           (for fn = (car v))
-          (for pnames = (mapcar #'make-keyword (cdr v)))
+          (for pnames = (cdr v))
           (for params = (remove-if-not (lambda (x)
                                          (member x pnames))
                                        (parameters page)
@@ -174,7 +174,6 @@
           (unless (and (every #'validp params)
                        (apply fn (mapcar #'val params)))
             (mapc #'unbind-parameter! params)))))
-
 
 
 

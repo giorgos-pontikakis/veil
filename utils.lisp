@@ -1,4 +1,4 @@
-(in-package :widgets)
+(in-package :veil)
 
 (defun group-duplicate-keys (alist &key (test #'eql))
   (iter (with result)
@@ -12,7 +12,7 @@
 (defun parse-query-string (string)
   (mapcar (lambda (name-value)
             (let ((pair (split "=" name-value)))
-              (cons (make-keyword (string-upcase (first pair)))
+              (cons (symbolicate (string-upcase (first pair)))
                     (second pair))))
           (split "&" string)))
 

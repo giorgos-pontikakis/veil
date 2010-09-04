@@ -1,4 +1,4 @@
-(in-package :widgets)
+(in-package :veil)
 
 (declaim (optimize (speed 0) (debug 3)))
 
@@ -17,7 +17,32 @@
    (webroot        :accessor webroot        :initarg  :webroot)
    (debug-p        :accessor debug-p        :initarg  :debug-p)
    (acceptor       :accessor acceptor       :initarg  :acceptor)
-   (dispatch-table :reader   dispatch-table :initform (make-hash-table))))
+   (ssl-p          :reader   ssl-p          :initarg  :ssl-p) 
+   (dispatch-table :reader   dispatch-table :initform (make-hash-table))
+   (published-p    :accessor published-p    :initarg  :published-p))
+  (:default-initargs :ssl-p nil))
+
+(defmethod initialize-instance :after ((webapp webapp) &key)
+  (setf (acceptor webapp)
+        (if (ssl-p webapp)
+            (make-instance 'hunchentoot:ssl-acceptor
+                           :port (port webapp)
+                           :request-dispatcher (make-hashtable-request-dispatcher webapp)
+                           :name (name webapp))
+            (make-instance 'hunchentoot:acceptor
+                           :port (port webapp) 
+                           :request-dispatcher (make-hashtable-request-dispatcher webapp)
+                           :name (name webapp))))
+  (setf (published-p webapp) nil))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmacro with-webapp ((webapp webapp-specifier) &body body)
+    `(let ((,webapp (ensure-webapp ,webapp-specifier)))
+       (if webapp
+           (progn
+             ,@body)
+           (error "Webapp not found in *webapps*.")))))
+
 
 
 (defun find-webapp (name)
@@ -26,44 +51,45 @@
 
 (defun register-webapp (webapp)
   "Push an new webapp into *webapps*, discarding old webapps with the same name"
-  (unregister-webapp webapp)
+  (unregister-webapp (name webapp))
   (push webapp *webapps*))
 
 (defun unregister-webapp (webapp-specifier)
-  "Remove a webapp from *webapps*. Specifier must be
-  the name of the webapp or the object itself. "
-  (setf *webapps*
-        (remove (ensure-webapp webapp-specifier) *webapps* :key #'name)))
+  "Remove a webapp from *webapps*. If it is already published, unpublish it. "
+  (with-webapp (webapp webapp-specifier)
+    (when (published-p webapp)
+      (unpublish-webapp webapp))
+    (setf *webapps* (remove webapp *webapps*))))
 
 
 (defun package-webapp ()
   "Return the webapp with name being the keyword of the current package name."
-  (let ((app (find *webapps*
-                   (make-keyword (package-name *package*)) :key #'name)))
-    (or app (error "No webapp loaded for the current package."))))
+  (or (find (symbolicate (package-name *package*))
+            *webapps* :key #'name)
+      (error "No webapp loaded for the current package.")))
 
 (defun ensure-webapp (webapp-specifier)
   (if (symbolp webapp-specifier)
       (find-webapp webapp-specifier)
       webapp-specifier))
 
-(defun start-webapp (&optional webapp-specifier ssl-p) 
-  (let* ((webapp (ensure-webapp webapp-specifier))
-         (acceptor (if ssl-p
-                       (make-instance 'ssl-acceptor
-                                      :port (port webapp)
-                                      :request-dispatcher (make-hashtable-request-dispatcher webapp)
-                                      :name (name webapp))
-                       (make-instance 'acceptor
-                                      :port (port webapp) 
-                                      :request-dispatcher (make-hashtable-request-dispatcher webapp)
-                                      :name (name webapp)))))
-    (setf (acceptor webapp) acceptor)
-    (start acceptor)))
+(defun publish-webapp (&optional (webapp-specifier (package-webapp)))
+  (with-webapp (webapp webapp-specifier)
+    (if (not (published-p webapp))
+        (progn
+          (hunchentoot:start (acceptor webapp))
+          (setf (published-p webapp) t))
+        (error "Webapp has already been published"))))
 
-(defun stop-webapp (&optional (name (package-webapp)))
-  (let ((webapp (find-webapp name)))
-    (stop (acceptor webapp))))
+(defun unpublish-webapp (&optional (webapp-specifier (package-webapp)))
+  (with-webapp (webapp webapp-specifier)
+    (if (published-p webapp)
+        (progn
+          (hunchentoot:stop (acceptor webapp))
+          (setf (published-p webapp) nil)
+          (values))
+        (error "Webapp has not been published."))))
+
 
 
 
@@ -88,14 +114,5 @@ the *dispatch-table* list."
           (for action = (funcall dispatcher request))
           (when action
             (return (funcall action)))
-          (finally (setf (return-code* *reply*) +http-not-found+)))))
-
-
-
-;;; --- Macros ---
-
-(defmacro with-webapp ((&optional name) &body body)
-  (let ((*webapp* (or (ensure-webapp name)
-                      (webapp (package-webapp)))))
-    (declare (special *webapp*))
-    ,@body))
+          (finally (setf (hunchentoot:return-code* hunchentoot:*reply*)
+                         hunchentoot:+http-not-found+)))))

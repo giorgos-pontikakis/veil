@@ -1,41 +1,55 @@
-(in-package :widgets)
+(in-package :veil)
 
 (declaim (optimize (speed 0) (debug 3)))
 
-(defparameter *scrooge*
-  (make-instance 'webapp
+(defvar *scrooge*
+  (make-instance 'webapp-db
                  :name 'scrooge 
                  :port 3001
                  :webroot "/scrooge/"
-                 :debug-p nil))
+                 :debug-p nil
+                 :dbname "scrooge"
+                 :dbhost "localhost"
+                 :dbuser "gnp"
+                 :dbpass ""
+                 :adapter "postgres"))
 
 (defparameter *foopage*
   (make-instance 'dynamic-page
                  :name 'foo
                  :base-url "actions/foo"
-                 :con-type *default-content-type*
+                 :content-type hunchentoot:*default-content-type*
                  :request-type :get
                  :parameters (list (make-instance 'http-parameter
-                                                  :name :id
+                                                  :name 'id
                                                   :lisp-type 'integer
                                                   :validator (lambda (int)
                                                                (and (integerp int)
                                                                     (> int 0)))
                                                   :requiredp nil)
                                    (make-instance 'http-parameter
-                                                  :name :title
+                                                  :name 'title
                                                   :lisp-type 'string
                                                   :validator (lambda (string)
                                                                (not (emptyp string)))
                                                   :requiredp nil))
-                 :validators (list (list #'(lambda (id title)
+                 :validators nil #|(list (list #'(lambda (id title)
                                              (and (= id 1) (string= title "gnp")))
-                                         'id 'title))
-                 :body (lambda ()
+                                         'id 'title))|#
+                 :body (lambda (id title) 
                          (with-html
-                           (:h1 "it works!")))))
+                           (:h1 "It works!")
+                           (:p (str id))
+                           (:p (str title))))))
 
-(register-webapp *scrooge*)
+(define-dynamic-page gnp (foo (bar integer #'plusp)) ("foo" :webapp *scrooge*)
+  (with-html 
+    (:p "It works as well - foo = "
+        (str (or (val foo) "[not given]"))
+        " and bar = "
+        (str (or (val bar) "[not given]")))))
+
+
 (register-page *foopage* *scrooge*)
 (publish-pages *scrooge*)
 
