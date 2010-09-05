@@ -12,31 +12,31 @@
    (base-url :accessor base-url :initarg :base-url)))
 
 
-(defun find-page (name &optional (webapp-specifier (package-webapp)))
-  "Take the page name (a symbol) and a webapp specifier (symbol or
+(defun find-page (name &optional (webapp-designator (package-webapp)))
+  "Take the page name (a symbol) and a webapp designator (symbol or
 object). Return the page object. "
-  (gethash name (pages (ensure-webapp webapp-specifier))))
+  (gethash name (pages (ensure-webapp webapp-designator))))
 
-(defun register-page (page &optional (webapp-specifier (package-webapp)))
+(defun register-page (page &optional (webapp-designator (package-webapp)))
   "Add a page to a webapp's pages"
-  (let ((webapp (ensure-webapp webapp-specifier)))
+  (let ((webapp (ensure-webapp webapp-designator)))
     (setf (slot-value page 'webapp) webapp)
     (setf (gethash (name page) (pages webapp))
           page)))
 
-(defun unregister-page (page-specifier)
+(defun unregister-page (page-designator)
   "Remove a page from a webapp's pages"
-  (let ((page (ensure-page page-specifier)))
+  (let ((page (ensure-page page-designator)))
     (remhash (name page) (pages (webapp page)))))
 
-(defun full-url (page-specifier)
-  (let ((page (ensure-page page-specifier)))
+(defun full-url (page-designator)
+  (let ((page (ensure-page page-designator)))
     (concatenate 'string (webroot (webapp page)) (base-url page))))
 
-(defun ensure-page (page-specifier)
-  (if (symbolp page-specifier)
-      (find-page page-specifier)
-      page-specifier))
+(defun ensure-page (page-designator)
+  (if (symbolp page-designator)
+      (find-page page-designator)
+      page-designator))
 
 
 
@@ -66,7 +66,7 @@ object). Return the page object. "
 (defmethod handler ((page dynamic-page))
   #'(lambda ()
       (setf (hunchentoot:content-type*) (content-type page))
-      (bind-parameters! page)
+      (bind-parameters! page (hunchentoot:query-string*))
       (with-html-output-to-string (*standard-output*)
         (apply (body page) (parameters page)))))
 
@@ -156,11 +156,11 @@ object). Return the page object. "
 (defmethod %build-page ((page external-page))
   (values))
 
-(defun build-page (page-specifier)
-  (%build-page (ensure-page page-specifier)))
+(defun build-page (page-designator)
+  (%build-page (ensure-page page-designator)))
 
-(defun build-pages (&optional (webapp-specifier (package-webapp)))
-  (iter (for page in (pages (ensure-webapp webapp-specifier)))
+(defun build-pages (&optional (webapp-designator (package-webapp)))
+  (iter (for page in (pages (ensure-webapp webapp-designator)))
 	(%build-page page)
 	(collect (name page))))
 
@@ -178,11 +178,11 @@ object). Return the page object. "
 (defmethod %publish-page ((page external-page)) 
   (values))
 
-(defun publish-page (page-specifier)
-  (%publish-page (ensure-page page-specifier)))
+(defun publish-page (page-designator)
+  (%publish-page (ensure-page page-designator)))
 
-(defun publish-pages (&optional (webapp-specifier (package-webapp))) 
-  (iter (for (nil page) in-hashtable (pages (ensure-webapp webapp-specifier)))
+(defun publish-pages (&optional (webapp-designator (package-webapp))) 
+  (iter (for (nil page) in-hashtable (pages (ensure-webapp webapp-designator)))
 	(%publish-page page)
 	(collect (name page))))
 
@@ -195,7 +195,7 @@ object). Return the page object. "
 
 ;; -- Published pages --
 
-(defun published-pages (&optional (webapp-specifier (package-webapp)))
-  (let ((webapp (ensure-webapp webapp-specifier)))
+(defun published-pages (&optional (webapp-designator (package-webapp)))
+  (let ((webapp (ensure-webapp webapp-designator)))
     (iter (for (name nil) in-hashtable (dispatch-table webapp))
           (collect name))))

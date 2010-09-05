@@ -55,9 +55,12 @@
 ;; html to lisp
 
 (defmethod html->lisp :around (value type) 
-  (if (string-equal value +html-null+)
-      :null
-      (call-next-method)))
+  (cond ((null value)
+         nil)
+        ((string-equal value +html-null+)
+         :null)
+        (t 
+         (call-next-method))))
 
 (defmethod html->lisp (value (type (eql 'string)))
   (string-trim " " value))
@@ -155,12 +158,14 @@
 (defun bind-parameters! (page &optional query-string)
   (let ((query-alist (group-duplicate-keys (if (boundp '*request*)
                                                (if (eql (request-type page) :get)
-                                                   #'get-parameters*
-                                                   #'post-parameters*)
+                                                   #'hunchentoot:get-parameters*
+                                                   #'hunchentoot:post-parameters*)
                                                (parse-query-string query-string)))))
     ;; First, bind parameters and check with their own validators
+    
     (iter (for p in (parameters page))
-          (for raw = (cdr (assoc (name p) query-alist)))
+          ;; See parse-query-string comment for the assoc comparison & make-keyword
+          (for raw = (cdr (assoc (make-keyword (name p)) query-alist)))
           (bind-parameter! p raw))
     ;; Then, check again using the page validators
     (iter (for v in (validators page))

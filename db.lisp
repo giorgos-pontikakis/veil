@@ -4,22 +4,20 @@
 
 ;;; Class definitions
 
-(defclass db-mixin ()
+(defclass db ()
   ((dbname  :accessor dbname  :initarg :dbname)
    (dbhost  :accessor dbhost  :initarg :dbhost)
    (dbuser  :accessor dbuser  :initarg :dbuser)
    (dbpass  :accessor dbpass  :initarg :dbpass) 
    (adapter :accessor adapter :initarg :adapter)))
 
-(defclass webapp-db (webapp db-mixin)
-  ())
-
+(defparameter *db* nil)
 
 
 ;;; Utilities
 
-(defmacro with-db (&body body)
-  `(with-connection (list (dbname *webapp*) (dbuser *webapp*) (dbpass *webapp*) (dbhost *webapp*)) 
+(defmacro with-db ((&optional (db *db*)) &body body)
+  `(with-connection (list (dbname *db*) (dbuser *db*) (dbpass *db*) (dbhost *db*)) 
      ,@body))
 
 (defmacro select-dao-unique (type &optional (test t) &rest ordering)

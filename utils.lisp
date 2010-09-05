@@ -10,9 +10,12 @@
         (finally (return result))))
 
 (defun parse-query-string (string)
+  ;; Return alist with keys as keywords not symbols, because this is
+  ;; run by hunchentoot in a separate thread in the common-lisp-user
+  ;; package, so the symbols differ from whatever package we are in.
   (mapcar (lambda (name-value)
             (let ((pair (split "=" name-value)))
-              (cons (symbolicate (string-upcase (first pair)))
+              (cons (make-keyword (string-upcase (first pair)))
                     (second pair))))
           (split "&" string)))
 
