@@ -31,14 +31,9 @@
    :ssl-p	      
    :dispatch-table
    :published-p
-   ;; webapp functions
-   :find-webapp
-   :register-webapp
-   :unregister-webapp
-   :package-webapp
+   ;; webapp functions 
    :publish-webapp
-   :unpublish-webapp
-   :define-webapp
+   :unpublish-webapp 
    ;; page classes
    :page
    :name

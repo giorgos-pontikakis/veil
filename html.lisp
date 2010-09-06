@@ -22,11 +22,9 @@
        ,@body)))
 
 (defmacro with-document ((&rest html-params) &body body)
-  `(progn
-     (with-html-output (*standard-output* nil :prologue t :indent nil)
-       (:html ,@html-params
-	      ,@body))
-     nil))
+  `(with-html-output (*standard-output* nil :prologue t :indent nil)
+     (:html ,@html-params
+       ,@body)))
 
 (defun render (html &rest args)
   (with-html

@@ -12,31 +12,38 @@
    (base-url :accessor base-url :initarg :base-url)))
 
 
-(defun find-page (name &optional (webapp-designator (package-webapp)))
+(defun find-page (name &optional webapp)
   "Take the page name (a symbol) and a webapp designator (symbol or
 object). Return the page object. "
-  (gethash name (pages (ensure-webapp webapp-designator))))
+  (gethash name (pages (ensure-webapp webapp))))
 
-(defun register-page (page &optional (webapp-designator (package-webapp)))
+(defun register-page (page &optional webapp)
   "Add a page to a webapp's pages"
-  (let ((webapp (ensure-webapp webapp-designator)))
-    (setf (slot-value page 'webapp) webapp)
-    (setf (gethash (name page) (pages webapp))
+  (let ((app (ensure-webapp webapp)))
+    (setf (slot-value page 'webapp) app)
+    (setf (gethash (name page) (pages app))
           page)))
 
-(defun unregister-page (page-designator)
+(defun unregister-page (page-name &optional webapp)
   "Remove a page from a webapp's pages"
-  (let ((page (ensure-page page-designator)))
-    (remhash (name page) (pages (webapp page)))))
+  (let ((page (find-page page-name webapp)))
+    (if page
+        (remhash (name page) (pages (webapp page)))
+        (error "Page not found."))))
 
-(defun full-url (page-designator)
-  (let ((page (ensure-page page-designator)))
-    (concatenate 'string (webroot (webapp page)) (base-url page))))
+(defun full-url (page-name &optional webapp)
+  (let ((page (find-page page-name webapp)))
+    (if page
+        (concatenate 'string (webroot (webapp page)) (base-url page))
+        (error "Page not found."))))
 
-(defun ensure-page (page-designator)
-  (if (symbolp page-designator)
-      (find-page page-designator)
-      page-designator))
+;; (defun ensure-page (page-designator &optional webapp)
+;;   (cond ((symbolp page-designator)
+;;          (find-page page-designator webapp))
+;;         ((typep page-designator 'page)
+;;          page-designator)
+;;         (t
+;;          (error "Invalid page designator"))))
 
 
 
@@ -58,7 +65,7 @@ object). Return the page object. "
                      (dispatch-table (webapp page)))
             ;; this is the dispatcher
             #'(lambda (request) 
-                (if (string-equal (full-url page)
+                (if (string-equal (full-url (name page))
                                   (hunchentoot:script-name request))
                     (handler page)
                     nil)))))
@@ -67,27 +74,9 @@ object). Return the page object. "
   #'(lambda ()
       (setf (hunchentoot:content-type*) (content-type page))
       (bind-parameters! page (hunchentoot:query-string*))
-      (with-html-output-to-string (*standard-output*)
-        (apply (body page) (parameters page)))))
-
-(defmacro define-dynamic-page (name (&rest param-spec)
-			       (base-url &key
-					 (content-type hunchentoot:*default-content-type*)
-					 (request-type :get)
-					 validators
-                                         webapp)
-			       &body body)
-  `(register-page
-    (make-instance 'dynamic-page
-                   :name ',name
-                   :base-url ,base-url
-                   :content-type ,content-type
-                   :request-type ,request-type
-                   :parameters (list ,@(build-parameter-list param-spec))
-                   :validators ,validators
-                   :body (lambda (,@(build-parameter-names param-spec)) 
-                           ,@body))
-    (or ,webapp (package-webapp))))
+      (let ((output (with-output-to-string (*standard-output*)
+                      (apply (body page) (parameters page))))) 
+        output)))
 
 (defun build-parameter-list (spec)
   (mapcar (lambda (spec1)
@@ -104,6 +93,27 @@ object). Return the page object. "
 
 (defun build-parameter-names (spec)
   (mapcar #'first (mapcar #'ensure-list spec)))
+
+(defmacro define-dynamic-page (name (&rest param-spec)
+			       (base-url &key
+					 (content-type hunchentoot:*default-content-type*)
+					 (request-type :get)
+					 validators
+                                         webapp)
+			       &body body)
+  `(progn
+     (register-page
+      (make-instance 'dynamic-page
+                     :name ',name
+                     :base-url ,base-url
+                     :content-type ,content-type
+                     :request-type ,request-type
+                     :parameters (list ,@(build-parameter-list param-spec))
+                     :validators ,validators
+                     :body (lambda (,@(build-parameter-names param-spec)) 
+                             ,@body))
+      (or ,webapp *webapp*))
+     (publish-page ',name)))
 
 
 
@@ -156,11 +166,11 @@ object). Return the page object. "
 (defmethod %build-page ((page external-page))
   (values))
 
-(defun build-page (page-designator)
-  (%build-page (ensure-page page-designator)))
+(defun build-page (page-name &optional webapp)
+  (%build-page (find-page page-name (ensure-webapp webapp))))
 
-(defun build-pages (&optional (webapp-designator (package-webapp)))
-  (iter (for page in (pages (ensure-webapp webapp-designator)))
+(defun build-pages (&optional webapp)
+  (iter (for page in (pages (ensure-webapp webapp)))
 	(%build-page page)
 	(collect (name page))))
 
@@ -178,24 +188,23 @@ object). Return the page object. "
 (defmethod %publish-page ((page external-page)) 
   (values))
 
-(defun publish-page (page-designator)
-  (%publish-page (ensure-page page-designator)))
+(defun publish-page (page-name &optional webapp)
+  (%publish-page (find-page page-name (ensure-webapp webapp))))
 
-(defun publish-pages (&optional (webapp-designator (package-webapp))) 
-  (iter (for (nil page) in-hashtable (pages (ensure-webapp webapp-designator)))
+(defun publish-pages (&optional webapp) 
+  (iter (for (nil page) in-hashtable (pages (ensure-webapp webapp)))
 	(%publish-page page)
 	(collect (name page))))
 
 
 ;; -- Unpublish --
 
-;; Not implemented -- seems unnecessary.
+;; Not implemented yet.
 
 
 
 ;; -- Published pages --
 
-(defun published-pages (&optional (webapp-designator (package-webapp)))
-  (let ((webapp (ensure-webapp webapp-designator)))
-    (iter (for (name nil) in-hashtable (dispatch-table webapp))
-          (collect name))))
+(defun published-pages (&optional webapp)
+  (iter (for (name nil) in-hashtable (dispatch-table (ensure-webapp webapp)))
+        (collect name)))

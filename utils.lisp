@@ -28,6 +28,14 @@
 	  (find char "<>&'\"")))
 
 (setf (html-mode) :xml)
+(setf hunchentoot:*hunchentoot-default-external-format* (flexi-streams:make-external-format :utf-8))
+(setf hunchentoot:*default-content-type* "text/html; charset=UTF-8") 
+(setf hunchentoot:*use-user-agent-for-sessions* t)
+(setf hunchentoot:*use-remote-addr-for-sessions* t)
+(setf hunchentoot:*show-lisp-errors-p* t)
+(setf hunchentoot:*log-lisp-errors-p* t)
+(setf hunchentoot:*log-lisp-warnings-p* t)
+
 
 ;;; ----------------------------------------------------------------------
 ;;; HTML macros
