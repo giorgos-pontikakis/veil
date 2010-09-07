@@ -13,13 +13,12 @@
    ;; db 
    :db
    :*db*
+   :define-db
    :with-db
    :select-dao-unique
    ;; webapp class
    :webapp
    :*webapp*
-   :*webapps*
-   :with-webapp
    :name	      
    :root-path     
    :static-path   
@@ -31,7 +30,8 @@
    :ssl-p	      
    :dispatch-table
    :published-p
-   ;; webapp functions 
+   ;; webapp functions
+   :define-webapp
    :publish-webapp
    :unpublish-webapp 
    ;; page classes

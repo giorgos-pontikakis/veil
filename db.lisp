@@ -13,6 +13,11 @@
 
 (defparameter *db* nil)
 
+(defmacro define-db (parameter &body body)
+  `(progn 
+     (defvar ,parameter (make-instance 'db ,@body))
+     (setf *db* ,parameter)))
+
 
 ;;; Utilities
 
