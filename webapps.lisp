@@ -3,7 +3,7 @@
 (declaim (optimize (speed 0) (debug 3)))
 
 ;;; ----------------------------------------------------------------------
-;;; Web applications     
+;;; Web applications class
 ;;; ----------------------------------------------------------------------
 
 (defclass webapp ()
@@ -46,6 +46,8 @@
   (cond ((and webapp (typep webapp 'webapp)) webapp)
         ((and *webapp* (typep *webapp* 'webapp)) *webapp*)
         (t (error "Webapp not found"))))
+
+
 
 ;; ----------------------------------------------------------------------
 ;; Publish and Unpublish
@@ -93,15 +95,3 @@ the *dispatch-table* list."
           (finally (setf (hunchentoot:return-code* hunchentoot:*reply*)
                          hunchentoot:+http-not-found+)))))
 
-
-
-;; (defmacro define-webapp (name &body key-args)
-;;   (with-gensyms (app)
-;;     `(progn
-;;        (let ((,app (make-instance 'webapp :name ',name ,@key-args)))
-;;          (register-webapp ,app)
-;;          (publish-webapp ,app)))))
-
-;; (defmacro with-webapp ((&optional webapp-designator) &body body)
-;;   `(let ((*webapp* (ensure-webapp (or ,webapp-designator (package-webapp *package*)))))
-;;      ,@body))

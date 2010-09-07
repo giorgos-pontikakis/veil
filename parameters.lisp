@@ -7,11 +7,11 @@
 ;;; ----------------------------------------------------------------------
 
 (define-condition http-parse-error ()
-  ((raw-value   :accessor raw-value   :initarg :raw-value)
-   (http-type   :accessor http-type   :initarg :http-type)))
+  ((raw-value :accessor raw-value :initarg :raw-value)
+   (http-type :accessor http-type :initarg :http-type)))
 
 (define-condition validation-error ()
-  ((raw-value  :accessor raw-value  :initarg :raw-value)))
+  ((raw-value :accessor raw-value :initarg :raw-value)))
 
 
 
@@ -161,8 +161,7 @@
                                                    #'hunchentoot:get-parameters*
                                                    #'hunchentoot:post-parameters*)
                                                (parse-query-string query-string)))))
-    ;; First, bind parameters and check with their own validators
-    
+    ;; First, bind parameters and check with their own validators 
     (iter (for p in (parameters page))
           ;; See parse-query-string comment for the assoc comparison & make-keyword
           (for raw = (cdr (assoc (make-keyword (name p)) query-alist)))
@@ -180,158 +179,3 @@
                        (apply fn (mapcar #'val params)))
             (mapc #'unbind-parameter! params)))))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-;; (defun foo (string)
-;;   (conc "foo" string))
-
-;; (defclass )
-
-
-;; (defclass input (input-elements)
-;;   ((name      :accessor name      :initarg :name)
-;;    (style     :accessor style     :initarg :style)
-;;    (disabledp :accessor disabledp :initarg :disabledp)
-;;    (passwordp :accessor passwordp :initarg :passwordp)
-;;    (value     :accessor value     :initarg :value)))
-
-;; (defun input (name &key style readonlyp disabledp passwordp value)
-;;   )
-
-
-;; (defmethod render ((obj textbox))
-;;   (with-html
-;;     (:input :id (string-downcase name)
-;;             :class style
-;;             :type (if passwordp "password" "text")
-;;             :name (string-downcase name)
-;;             :value (lisp-to-html (or value :null))
-;;             :readonly readonlyp
-;;             :disabled disabledp)))
-
-
-
-
-
-
-
-;; ;;; Selector
-
-;; (defclass cell-selector (cell-crud)
-;;   ((href-enabled  :accessor href-enabled  :initarg :href-enabled)
-;;    (href-disabled :accessor href-disabled :initarg :href-disabled)))
-
-;; (defmethod render ((cell cell-selector) &key)
-;;   (with-html 
-;;     (if (enabledp cell)
-;;         (htm (:a :href href-enabled
-;;                  (htm (:img :src (url "img/bullet_red.png")))))
-;;         (htm (:a :href href-disabled
-;;                  (htm (:img :src (url "img/bullet_blue.png"))))))))
-
-;; (defmethod selector-href ((row row-crud))
-;;   (let ((table (table row)))
-;;     (apply (main-page table)
-;;            (if barep
-;;                (filter-params table)
-;;                (append (id-data row) (filter-params table))))))
-
-;; (defmethod input-box-style ((row row-crud))
-;;   (let ((p (find (name cell) (params (table (row cell))) :key #'name)))
-;;     (if (or (null p) (validp p)) "" "attention")))
-
-
-
-;; ;;; Textbox
-
-;; (labels ((param (cell)
-;;            )
-;;          (box-style ()
-;;            )))
-
-;; (defclass cell-textbox (cell-crud)
-;;   ())
-
-;; (defmethod render ((cell cell-textbox) &key) 
-;;   (if (enabledp cell) 
-;;       (with-html
-;;         (textbox (name cell) 
-;;                  :value (value cell)
-;;                  :style (style cell)))
-;;       (call-next-method)))
-
-
-
-;; ;;; Dropdown
-
-;; (defclass cell-dropdown (cell-crud)
-;;   ((pairs :accessor pairs :initarg :pairs)))
-
-;; (defmethod render ((cell cell-dropdown) &key)
-;;   (if (enabledp cell)
-;;       (with-html
-;;         (dropdown (name cell)
-;;                   (pairs cell)
-;;                   :style style
-;;                   :selected (value cell)))
-;;       (call-next-method)))
-
-
-;; ;; Submit
-
-;; (defclass cell-submit (cell-crud)
-;;   ())
-
-;; (defmethod render ((cell cell-submit) &key)
-;;   (if (enabledp cell)
-;;       (with-html
-;;         (:button :type "submit"
-;;                  (:img :src (url "img/tick.png"))))
-;;       (with-html
-;;         "")))
-
-
-;; ;; Cancel
-
-;; (defclass cell-cancel (cell-crud)
-;;   ((href :accessor href :initarg :href)))
-
-;; (defmethod render ((cell cell-cancel) &key) 
-;;   (if (enabledp cell)
-;;       (with-html
-;;         (:a :href (href cell)
-;;             (:img :src (url "img/cancel.png"))))
-;;       (with-html
-;;         "")))

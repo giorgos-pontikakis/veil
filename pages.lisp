@@ -37,14 +37,6 @@ object). Return the page object. "
         (concatenate 'string (webroot (webapp page)) (base-url page))
         (error "Page not found."))))
 
-;; (defun ensure-page (page-designator &optional webapp)
-;;   (cond ((symbolp page-designator)
-;;          (find-page page-designator webapp))
-;;         ((typep page-designator 'page)
-;;          page-designator)
-;;         (t
-;;          (error "Invalid page designator"))))
-
 
 
 ;;; ----------------------------------------------------------------------
