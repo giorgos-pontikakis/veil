@@ -2,6 +2,8 @@
 
 (declaim (optimize (speed 0) (debug 3)))
 
+(defun indent ()
+  (debug-p *webapp*))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmacro with-html (&body body)
@@ -21,10 +23,27 @@
      (with-html
        ,@body)))
 
-(defmacro with-document ((&rest html-params) &body body)
-  `(with-html-output (*standard-output* nil :prologue t :indent nil)
-     (:html ,@html-params
-       ,@body)))
+(defmacro with-document ((&optional spec &rest html-params) &body body)
+  (ecase spec
+    ((:xhtml nil)
+     `(progn
+        (setf (html-mode) :xml)
+        (with-html-output (*standard-output* nil :prologue t :indent (indent)) 
+          (:html ,@html-params
+            ,@body))))
+    ((:html4)
+     `(progn
+        (setf (html-mode) :sgml)
+        (with-html-output (*standard-output* nil :prologue t :indent (indent)) 
+          (:html ,@html-params
+            ,@body))))
+    ((:xml)
+     `(progn
+        (setf (html-mode) :xml) 
+        (with-html-output (*standard-output* nil :prologue nil :indent (indent))
+          (fmt "<?xml version=\"1.0\" encoding=\"utf-8\"?>~&")
+          (:html ,@html-params
+            ,@body))))))
 
 (defun render (html &rest args)
   (with-html

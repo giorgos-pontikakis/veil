@@ -124,8 +124,7 @@
 	     :raw-value (raw-value c)))))
 
 (defun bind-parameter! (p raw)
-  (handler-case (let ((parsed (parse-raw raw (lisp-type p))))
-                  (break)
+  (handler-case (let ((parsed (parse-raw raw (lisp-type p)))) 
                   (cond
                     ;; parameter not supplied
                     ((null raw) 
@@ -158,8 +157,8 @@
 (defun bind-parameters! (page &optional query-string)
   (let ((query-alist (group-duplicate-keys (if (boundp '*request*)
                                                (if (eql (request-type page) :get)
-                                                   #'hunchentoot:get-parameters*
-                                                   #'hunchentoot:post-parameters*)
+                                                   #'get-parameters*
+                                                   #'post-parameters*)
                                                (parse-query-string query-string)))))
     ;; First, bind parameters and check with their own validators 
     (iter (for p in (parameters page))

@@ -2,7 +2,8 @@
 
 (defpackage :veil
   (:use :common-lisp
-	:lisputils 
+	:lisputils
+        :hunchentoot
 	:cl-who
 	:cl-ppcre
 	:iterate
@@ -27,7 +28,7 @@
    :webroot	      
    :debug-p	      
    :acceptor      
-   :ssl-p	      
+   :use-ssl-p	      
    :dispatch-table
    :published-p
    ;; webapp functions
@@ -61,7 +62,8 @@
    :build-pages
    :publish-page
    :publish-pages
-   ;; html
+   ;; html 
+   :indent
    :with-html
    :defhtml
    :html

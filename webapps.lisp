@@ -15,19 +15,19 @@
    (webroot        :accessor webroot        :initarg  :webroot)
    (debug-p        :accessor debug-p        :initarg  :debug-p)
    (acceptor       :accessor acceptor       :initarg  :acceptor)
-   (ssl-p          :reader   ssl-p          :initarg  :ssl-p) 
+   (use-ssl-p      :reader   use-ssl-p      :initarg  :use-ssl-p) 
    (dispatch-table :reader   dispatch-table :initform (make-hash-table))
    (published-p    :accessor published-p    :initarg  :published-p))
-  (:default-initargs :ssl-p nil))
+  (:default-initargs :use-ssl-p nil))
 
 (defmethod initialize-instance :after ((webapp webapp) &key)
   (setf (acceptor webapp)
-        (if (ssl-p webapp)
-            (make-instance 'hunchentoot:ssl-acceptor
+        (if (use-ssl-p webapp)
+            (make-instance 'ssl-acceptor
                            :port (port webapp)
                            :request-dispatcher (make-hashtable-request-dispatcher webapp)
                            :name (name webapp))
-            (make-instance 'hunchentoot:acceptor
+            (make-instance 'acceptor
                            :port (port webapp) 
                            :request-dispatcher (make-hashtable-request-dispatcher webapp)
                            :name (name webapp))))
@@ -57,7 +57,7 @@
   (let ((app (ensure-webapp webapp)))
     (if (not (published-p app))
         (progn
-          (hunchentoot:start (acceptor app))
+          (start (acceptor app))
           (setf (published-p app) t)
           t)
         (warn "Webapp has already been published"))))
@@ -66,7 +66,7 @@
   (let ((app (ensure-webapp webapp)))
     (if (published-p app)
         (progn
-          (hunchentoot:stop (acceptor app))
+          (stop (acceptor app))
           (setf (published-p app) nil)
           t)
         (warn "Webapp has not been published."))))
@@ -92,6 +92,6 @@ the *dispatch-table* list."
           (for action = (funcall dispatcher request))
           (when action
             (return (funcall action)))
-          (finally (setf (hunchentoot:return-code* hunchentoot:*reply*)
-                         hunchentoot:+http-not-found+)))))
+          (finally (setf (return-code* *reply*)
+                         +http-not-found+)))))
 

@@ -44,8 +44,7 @@ object). Return the page object. "
 ;;; ----------------------------------------------------------------------
 
 (defclass dynamic-page (page)
-  ((content-type :accessor content-type :initarg :content-type)
-   (request-type :accessor request-type :initarg :request-type)
+  ((request-type :accessor request-type :initarg :request-type)
    (handler      :accessor handler      :initarg :handler) 
    (parameters   :accessor parameters   :initarg :parameters)
    (validators   :accessor validators   :initarg :validators)
@@ -58,14 +57,13 @@ object). Return the page object. "
             ;; this is the dispatcher
             #'(lambda (request) 
                 (if (string-equal (full-url (name page))
-                                  (hunchentoot:script-name request))
+                                  (script-name request))
                     (handler page)
                     nil)))))
 
 (defmethod handler ((page dynamic-page))
-  #'(lambda ()
-      (setf (hunchentoot:content-type*) (content-type page))
-      (bind-parameters! page (hunchentoot:query-string*))
+  #'(lambda () 
+      (bind-parameters! page (query-string*))
       (let ((output (with-output-to-string (*standard-output*)
                       (apply (body page) (parameters page))))) 
         output)))
@@ -87,8 +85,7 @@ object). Return the page object. "
   (mapcar #'first (mapcar #'ensure-list spec)))
 
 (defmacro define-dynamic-page (name (&rest param-spec)
-			       (base-url &key
-					 (content-type hunchentoot:*default-content-type*)
+			       (base-url &key 
 					 (request-type :get)
 					 validators
                                          webapp)
@@ -97,8 +94,7 @@ object). Return the page object. "
      (register-page
       (make-instance 'dynamic-page
                      :name ',name
-                     :base-url ,base-url
-                     :content-type ,content-type
+                     :base-url ,base-url 
                      :request-type ,request-type
                      :parameters (list ,@(build-parameter-list param-spec))
                      :validators ,validators
