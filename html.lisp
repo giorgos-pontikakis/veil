@@ -7,10 +7,8 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmacro with-html (&body body)
-    `(progn
-       (with-html-output (*standard-output* nil :prologue nil :indent t)
-         ,@body)
-       "")))
+    `(with-html-output (*standard-output* nil :prologue nil :indent t)
+       ,@body))) ;; used to return ""
 
 (defmacro defhtml (name args &body body)
   `(defun ,name (&key ,@args)
@@ -19,7 +17,7 @@
          ,@body))))
 
 (defmacro html ((&rest args) &body body)
-  `(lambda (,@args)
+  `(lambda (&key ,@args)
      (with-html
        ,@body)))
 

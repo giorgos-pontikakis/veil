@@ -62,6 +62,9 @@
    :build-pages
    :publish-page
    :publish-pages
+   ;; parameters
+   :lisp->html
+   :html->lisp
    ;; html 
    :indent
    :with-html

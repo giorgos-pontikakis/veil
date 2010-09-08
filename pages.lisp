@@ -29,13 +29,13 @@ object). Return the page object. "
   (let ((page (find-page page-name webapp)))
     (if page
         (remhash (name page) (pages (webapp page)))
-        (error "Page not found."))))
+        (error "Page ~A not found." page-name))))
 
 (defun full-url (page-name &optional webapp)
   (let ((page (find-page page-name webapp)))
     (if page
         (concatenate 'string (webroot (webapp page)) (base-url page))
-        (error "Page not found."))))
+        (error "Page ~A not found." page-name))))
 
 
 
