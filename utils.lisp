@@ -15,7 +15,7 @@
   ;; package, so the symbols differ from whatever package we are in.
   (mapcar (lambda (name-value)
             (let ((pair (split "=" name-value)))
-              (cons (make-keyword (string-upcase (first pair)))
+              (cons (string-downcase (string-upcase (first pair)))
                     (second pair))))
           (split "&" string)))
 

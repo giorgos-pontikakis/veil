@@ -37,7 +37,7 @@
    :unpublish-webapp 
    ;; page classes
    :page
-   :name
+   :*page*
    :webapp
    :base-url
    :content-type
@@ -65,6 +65,13 @@
    ;; parameters
    :lisp->html
    :html->lisp
+   :lisp-type
+   :validator
+   :requiredp
+   :val
+   :raw
+   :validp
+   :suppliedp
    ;; html 
    :indent
    :with-html

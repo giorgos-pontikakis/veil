@@ -156,14 +156,16 @@
 
 (defun bind-parameters! (page &optional query-string)
   (let ((query-alist (group-duplicate-keys (if (boundp '*request*)
+                                               ;; normal behaviour
                                                (if (eql (request-type page) :get)
-                                                   #'get-parameters*
-                                                   #'post-parameters*)
-                                               (parse-query-string query-string)))))
+                                                   (get-parameters*)
+                                                   (post-parameters*))
+                                               ;; useful for` debugging
+                                               (parse-query-string query-string))))) 
     ;; First, bind parameters and check with their own validators 
     (iter (for p in (parameters page))
           ;; See parse-query-string comment for the assoc comparison & make-keyword
-          (for raw = (cdr (assoc (make-keyword (name p)) query-alist)))
+          (for raw = (cdr (assoc (string-downcase (name p)) query-alist :test #'string-equal))) 
           (bind-parameter! p raw))
     ;; Then, check again using the page validators
     (iter (for v in (validators page))

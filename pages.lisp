@@ -37,7 +37,7 @@ object). Return the page object. "
         (concatenate 'string (webroot (webapp page)) (base-url page))
         (error "Page ~A not found." page-name))))
 
-
+(defparameter *page* nil)
 
 ;;; ----------------------------------------------------------------------
 ;;; Dynamic pages
@@ -63,7 +63,7 @@ object). Return the page object. "
 
 (defmethod handler ((page dynamic-page))
   #'(lambda () 
-      (bind-parameters! page (query-string*))
+      (bind-parameters! page) 
       (let ((output (with-output-to-string (*standard-output*)
                       (apply (body page) (parameters page))))) 
         output)))
