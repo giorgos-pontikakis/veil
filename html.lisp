@@ -7,7 +7,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmacro with-html (&body body)
-    `(with-html-output (*standard-output* nil :prologue nil :indent t)
+    `(with-html-output (*standard-output* nil :prologue nil :indent nil)
        ,@body))) ;; used to return ""
 
 (defmacro defhtml (name args &body body)
@@ -17,7 +17,7 @@
          ,@body))))
 
 (defmacro html ((&rest args) &body body)
-  `(lambda (&key ,@args)
+  `(lambda (,@args)
      (with-html
        ,@body)))
 
@@ -44,13 +44,13 @@
             ,@body))))))
 
 (defun render (html &rest args)
-  (with-html
-    (cond ((null html) "")
-          ((functionp html)
-           (apply html args))
-          ((listp html)
-           (mapc #'render html))
-          (t (htm (str (lisp->html html)))))))
+  (cond ((null html) "")
+        ((functionp html)
+         (apply html args))
+        ((listp html)
+         (mapc #'render html))
+        (t (with-html
+             (str (lisp->html html))))))
 
 (defun url (&rest args)
   "Take a list of arguments, convert them to html, concatenate and

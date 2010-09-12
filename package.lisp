@@ -50,6 +50,7 @@
    :builder
    :publisher
    ;; page functions
+   :*page*
    :dynamic-page
    :static-page
    :external-page
@@ -65,13 +66,15 @@
    ;; parameters
    :lisp->html
    :html->lisp
-   :lisp-type
+   :lisp-type 
    :validator
    :requiredp
    :val
    :raw
    :validp
    :suppliedp
+   :find-parameter
+   :val*
    ;; html 
    :indent
    :with-html

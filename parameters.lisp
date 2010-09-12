@@ -102,6 +102,7 @@
 
 (defclass http-parameter () 
   ((name      :accessor name      :initarg :name)
+   (key       :accessor key       :initarg :key) 
    (lisp-type :accessor lisp-type :initarg :lisp-type) 
    (validator :accessor validator :initarg :validator)
    (requiredp :accessor requiredp :initarg :requiredp) 
@@ -109,7 +110,6 @@
    (raw       :accessor raw       :initarg :raw)
    (validp    :accessor validp    :initarg :validp)
    (suppliedp :accessor suppliedp :initarg :suppliedp)))
-
 
 
 
@@ -160,7 +160,7 @@
                                                (if (eql (request-type page) :get)
                                                    (get-parameters*)
                                                    (post-parameters*))
-                                               ;; useful for` debugging
+                                               ;; useful for debugging
                                                (parse-query-string query-string))))) 
     ;; First, bind parameters and check with their own validators 
     (iter (for p in (parameters page))
@@ -180,3 +180,22 @@
                        (apply fn (mapcar #'val params)))
             (mapc #'unbind-parameter! params)))))
 
+
+
+;;; ------------------------------------------------------------
+;;; Utilities
+;;; ------------------------------------------------------------
+
+(defun find-parameter (name &optional (page *page*))
+  (find name (parameters page) :key (if (keywordp name) #'name #'key)))
+
+(defun val* (param)
+  (cond 
+    ;; parameter is null or it is not supplied: return nil
+    ((or (null param) (not (suppliedp param)))
+     nil)
+    ;; parameter supplied but erroneous: return raw 
+    ((not (validp param))
+     (raw param))
+    ;; parameter supplied and ok: return val
+    (t (val param))))

@@ -10,33 +10,18 @@
         (finally (return result))))
 
 (defun parse-query-string (string)
-  ;; Return alist with keys as keywords not symbols, because this is
-  ;; run by hunchentoot in a separate thread in the common-lisp-user
-  ;; package, so the symbols differ from whatever package we are in.
+  ;; Return alist with keys as string. This simulates hunchentoot's
+  ;; get-parameters* result for debugging purposes.
   (mapcar (lambda (name-value)
             (let ((pair (split "=" name-value)))
-              (cons (string-downcase (string-upcase (first pair)))
+              (cons (string-downcase (first pair))
                     (second pair))))
           (split "&" string)))
 
-
-;;; ----------------------------------------------------------------------
-;;; HTML macros
-;;; ----------------------------------------------------------------------
-(defmacro with-html (&body body)
-  `(progn
-     (with-html-output (*standard-output* nil :prologue nil :indent t)
-       ,@body)
-     ""))
-
-(defmacro with-page ((&rest html-params) &body body)
-  `(progn
-     (with-html-output (*standard-output* nil :prologue t :indent nil)
-       (:html ,@html-params
-	      ,@body))
-     nil))
-
-(defmacro html ((&rest args) &body body)
-  `(lambda (,@args)
-    (with-html
-      ,@body)))
+(defun make-query-string (param-value-alist)
+  (with-output-to-string (*standard-output*)
+    (iter (for (sym . val) in param-value-alist)
+          (princ (if (first-time-p) #\? #\&))
+          (princ (string-downcase sym))
+          (princ #\=)
+          (princ (url-encode (lisp->html val))))))

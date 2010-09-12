@@ -39,6 +39,18 @@ object). Return the page object. "
 
 (defparameter *page* nil)
 
+(defmacro define-page-fn (page-name &optional arguments)
+  (with-gensyms (page param-value-alist)
+    `(defun ,page-name ,(cons '&key (append arguments (list 'fragment)))
+       (declare (ignorable fragment))
+       (let ((,page (find-page ',page-name))
+             (,param-value-alist (iter (for arg in ',arguments)
+                                       (for val in (list ,@arguments)) 
+                                       (when val
+                                         (collect (cons arg val))))))
+         (url (base-url ,page)
+              (make-query-string ,param-value-alist))))))
+
 ;;; ----------------------------------------------------------------------
 ;;; Dynamic pages
 ;;; ----------------------------------------------------------------------
@@ -63,10 +75,12 @@ object). Return the page object. "
 
 (defmethod handler ((page dynamic-page))
   #'(lambda () 
-      (bind-parameters! page) 
-      (let ((output (with-output-to-string (*standard-output*)
-                      (apply (body page) (parameters page))))) 
-        output)))
+      (let ((*page* page))
+        (declare (special *page*))
+        (bind-parameters! page) 
+        (let ((output (with-output-to-string (*standard-output*)
+                        (apply (body page) (parameters page))))) 
+          output))))
 
 (defun build-parameter-list (spec)
   (mapcar (lambda (spec1)
@@ -76,6 +90,7 @@ object). Return the page object. "
                                       requiredp) (ensure-list spec1)
               `(make-instance 'http-parameter
                               :name ',name
+                              :key (make-keyword ',name)
                               :lisp-type ',lisp-type
                               :validator ,(or validator '#'identity)
                               :requiredp ,requiredp)))
@@ -90,18 +105,20 @@ object). Return the page object. "
 					 validators
                                          webapp)
 			       &body body)
-  `(progn
-     (register-page
-      (make-instance 'dynamic-page
-                     :name ',name
-                     :base-url ,base-url 
-                     :request-type ,request-type
-                     :parameters (list ,@(build-parameter-list param-spec))
-                     :validators ,validators
-                     :body (lambda (,@(build-parameter-names param-spec)) 
-                             ,@body))
-      (or ,webapp *webapp*))
-     (publish-page ',name)))
+  (let ((parameter-names (build-parameter-names param-spec)))
+    `(progn
+       (register-page
+        (make-instance 'dynamic-page
+                       :name ',name
+                       :base-url ,base-url 
+                       :request-type ,request-type
+                       :parameters (list ,@(build-parameter-list param-spec))
+                       :validators ,validators
+                       :body (lambda (,@parameter-names) 
+                               ,@body))
+        (or ,webapp *webapp*))
+       (define-page-fn ,name ,parameter-names)
+       (publish-page ',name))))
 
 
 
