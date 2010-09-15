@@ -38,6 +38,7 @@
    ;; page classes
    :page
    :*page*
+   :key
    :webapp
    :base-url
    :content-type

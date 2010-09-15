@@ -8,6 +8,7 @@
 
 (defclass page ()
   ((name     :accessor name     :initarg :name)
+   (key      :accessor key      :initarg :key)
    (webapp   :reader   webapp) 
    (base-url :accessor base-url :initarg :base-url)))
 
@@ -110,6 +111,7 @@ object). Return the page object. "
        (register-page
         (make-instance 'dynamic-page
                        :name ',name
+                       :key (make-keyword ',name)
                        :base-url ,base-url 
                        :request-type ,request-type
                        :parameters (list ,@(build-parameter-list param-spec))
