@@ -126,10 +126,10 @@
 (defun bind-parameter! (p raw)
   (handler-case (let ((parsed (parse-raw raw (lisp-type p)))) 
                   (cond
-                    ;; parameter not supplied
-                    ((null raw) 
+                    ;; parameter not supplied or supplied but empty
+                    ((or (null raw) (eql parsed :null))
                      (setf (val p) nil
-                           (raw p) nil
+                           (raw p) raw
                            (validp p) (not (requiredp p))
                            (suppliedp p) nil))
                     ;; parameter supplied and it is valid.
