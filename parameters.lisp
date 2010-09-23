@@ -164,21 +164,20 @@
                                                (parse-query-string query-string))))) 
     ;; First, bind parameters and check with their own validators 
     (iter (for p in (parameters page))
-          ;; See parse-query-string comment for the assoc comparison & make-keyword
           (for raw = (cdr (assoc (string-downcase (name p)) query-alist :test #'string-equal))) 
           (bind-parameter! p raw))
     ;; Then, check again using the page validators
-    (iter (for v in (validators page))
-          (for fn = (car v))
-          (for pnames = (cdr v))
-          (for params = (remove-if-not (lambda (x)
-                                         (member x pnames))
-                                       (parameters page)
-                                       :key #'name))
-          
-          (unless (and (every #'validp params)
-                       (apply fn (mapcar #'val params)))
-            (mapc #'unbind-parameter! params)))))
+    (flet ((find-params (names) (remove-if-not (lambda (x)
+                                                 (member x names))
+                                               (parameters page)
+                                               :key #'name)))
+      (iter (for v in (validators page))
+            (destructuring-bind (tested (fn &rest args) msg) v  ;; tested, args are names
+              (let ((ptested (find-params tested))              ;; ptested, pargs are the 
+                    (pargs (find-params args)))                 ;; corresponding parameters
+                (unless (and (every #'validp pargs)
+                             (apply fn (mapcar #'val pargs)))
+                  (mapc #'unbind-parameter! ptested))))))))
 
 
 
