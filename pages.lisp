@@ -115,7 +115,7 @@ object). Return the page object. "
                        :base-url ,base-url 
                        :request-type ,request-type
                        :parameters (list ,@(build-parameter-list param-spec))
-                       :validators ,validators
+                       :validators ',validators
                        :body (lambda (,@parameter-names) 
                                ,@body))
         (or ,webapp *webapp*))
