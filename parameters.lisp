@@ -3,7 +3,7 @@
 (declaim (optimize (speed 0) (debug 3)))
 
 ;;; ----------------------------------------------------------------------
-;;; Conditions    
+;;; Conditions
 ;;; ----------------------------------------------------------------------
 
 (define-condition http-parse-error ()
@@ -16,7 +16,7 @@
 
 
 ;;; ----------------------------------------------------------------------
-;;; Lisp - HTML conversions 
+;;; Lisp - HTML conversions
 ;;; ----------------------------------------------------------------------
 
 (defparameter +html-true+ "true")
@@ -54,62 +54,62 @@
 
 ;; html to lisp
 
-(defmethod html->lisp :around (value type) 
+(defmethod html->lisp :around (value type)
   (cond ((null value)
          nil)
         ((string-equal value +html-null+)
          :null)
-        (t 
-         (call-next-method))))
+        (t
+         (call-next-method (string-trim " " value) type))))
 
 (defmethod html->lisp (value (type (eql 'string)))
-  (string-trim " " value))
+  value)
 
 (defmethod html->lisp (value (type (eql 'integer)))
-  (let ((trimmed-value (string-trim " " value)))
-    (handler-case (if (string-equal trimmed-value +html-false+)
-                      nil
-                      (parse-integer trimmed-value))
-      (parse-error () (error 'http-parse-error
-                             :http-type type
-                             :raw-value trimmed-value)))))
+  (handler-case (if (string-equal value +html-false+)
+                    nil
+                    (parse-integer value))
+    (parse-error () (error 'http-parse-error
+                           :http-type type
+                           :raw-value value))))
 
 (defmethod html->lisp (value (type (eql 'float)))
-  (let ((trimmed-value (string-trim " " value)))
-    (handler-case (if (string-equal trimmed-value +html-false+)
-                      nil
-                      (parse-float trimmed-value))
-      (parse-error () (error 'http-parse-error
-                             :http-type type
-                             :raw-value trimmed-value)))))
+  (handler-case (if (string-equal value +html-false+)
+                    nil
+                    (parse-float value))
+    (parse-error () (error 'http-parse-error
+                           :http-type type
+                           :raw-value value))))
 
 (defmethod html->lisp (value (type (eql 'boolean)))
-  (let ((trimmed-value (string-trim " " value)))
-    (cond ((string-equal trimmed-value +html-true+)  t)
-          ((string-equal trimmed-value +html-false+) nil) 
-          (t (error 'http-parse-error
-                    :http-type type
-                    :raw-value trimmed-value)))))
+  (cond ((string-equal value +html-true+)  t)
+        ((string-equal value +html-false+) nil)
+        (t (error 'http-parse-error
+                  :http-type type
+                  :raw-value value))))
 
 (defmethod html->lisp (value (type (eql 'symbol)))
-  (intern (string-upcase (string-trim " " value))))
+  (intern (string-upcase value)))
 
 
 
 ;;; ----------------------------------------------------------------------
-;;; HTTP parameters    
+;;; HTTP parameters
 ;;; ----------------------------------------------------------------------
 
-(defclass http-parameter () 
-  ((name      :accessor name      :initarg :name)
-   (key       :accessor key       :initarg :key) 
-   (lisp-type :accessor lisp-type :initarg :lisp-type) 
-   (validator :accessor validator :initarg :validator)
-   (requiredp :accessor requiredp :initarg :requiredp) 
-   (val       :accessor val       :initarg :val)
-   (raw       :accessor raw       :initarg :raw)
-   (validp    :accessor validp    :initarg :validp)
-   (suppliedp :accessor suppliedp :initarg :suppliedp)))
+(defclass http-parameter ()
+  ((name       :accessor name       :initarg :name)
+   (key        :accessor key        :initarg :key)
+   (page       :accessor page       :initarg :page)
+   (lisp-type  :accessor lisp-type  :initarg :lisp-type)
+   (vfn        :accessor vfn        :initarg :vfn)
+   (vargs      :accessor vargs      :initarg :vargs)
+   (val        :accessor val        :initarg :val)
+   (raw        :accessor raw        :initarg :raw)
+   (validp     :accessor validp     :initarg :validp)
+   (error-type :accessor error-type :initarg :error-type)
+   (requiredp  :accessor requiredp  :initarg :requiredp)
+   (suppliedp  :accessor suppliedp  :initarg :suppliedp)))
 
 
 
@@ -117,68 +117,58 @@
 ;;; run-time (request-time) parameter binding
 ;;; ----------------------------------------------------------------------
 
-(defun parse-raw (raw type)
-  (handler-case (html->lisp raw type)
-    (http-parse-error (c)
-      (error 'validation-error 
-	     :raw-value (raw-value c)))))
+(defun find-params (page names)
+  ;; Beware, future self: We have to iterate instead of using
+  ;; remove-if-not or something similar because we have to keep the
+  ;; order of the parameters unchanged
+  (let ((parameters (parameters page)))
+    (iter (for n in names)
+          (collect (find n parameters :key #'name)))))
 
-(defun bind-parameter! (p raw)
-  (handler-case (let ((parsed (parse-raw raw (lisp-type p)))) 
-                  (cond
-                    ;; parameter not supplied or supplied but empty
-                    ((or (null raw) (eql parsed :null))
-                     (setf (val p) nil
-                           (raw p) raw
-                           (validp p) (not (requiredp p))
-                           (suppliedp p) nil))
-                    ;; parameter supplied and it is valid.
-                    ;; Exception: we accept boolean parameters with parsed value = NIL 
-                    ((or (funcall (or (validator p) #'identity) parsed)
-                         (and (eql 'boolean (lisp-type p))
-                              (member parsed '(t nil))))
-                     (setf (val p) parsed
-                           (raw p) raw
-                           (validp p) t
-                           (suppliedp p) t))
-                    ;; parameter supplied but it is invalid
-                    (t (error 'validation-error
-                              :raw-value raw))))
-    (validation-error ()
-      (slot-makunbound p 'val)
+(defun parse-parameter (p raw)
+  (handler-case (let ((parsed (html->lisp raw (lisp-type p))))
+                  (if (and (null parsed)
+                           (not (eql 'boolean (lisp-type p))))
+                      (setf (raw p) raw
+                            (val p) nil
+                            (validp p) (not (requiredp p))
+                            (suppliedp p) nil
+                            (error-type p) nil)
+                      (setf (raw p) raw
+                            (val p) parsed
+                            (validp p) t
+                            (suppliedp p) t
+                            (error-type p) nil)))
+    (http-parse-error ()
       (setf (raw p) raw
+            ;; leave val slot unbound
             (validp p) nil
-            (suppliedp p) t))))
+            (suppliedp p) (if (null raw) nil t)
+            (error-type p) :parse-error))))
 
-(defun unbind-parameter! (p)
-  (slot-makunbound p 'val)
-  (setf (validp p) nil))
+(defun validate-parameter (p)
+  (let ((pargs (find-params (page p) (vargs p))))
+    (when (and (every #'suppliedp pargs)
+               (every #'validp pargs))
+      (let ((error-type (apply (vfn p) (mapcar #'val pargs))))
+        (when error-type
+          (slot-makunbound p 'val)
+          (setf (validp p) nil)
+          (setf (error-type p) error-type))))))
 
-(defun bind-parameters! (page &optional query-string)
+(defun set-parameters (page &optional query-string)
   (let ((query-alist (group-duplicate-keys (if (boundp '*request*)
                                                ;; normal behaviour
                                                (if (eql (request-type page) :get)
                                                    (get-parameters*)
                                                    (post-parameters*))
                                                ;; useful for debugging
-                                               (parse-query-string query-string))))) 
-    ;; First, bind parameters and check with their own validators 
+                                               (parse-query-string query-string)))))
     (iter (for p in (parameters page))
-          ;; See parse-query-string comment for the assoc comparison & make-keyword
-          (for raw = (cdr (assoc (string-downcase (name p)) query-alist :test #'string-equal))) 
-          (bind-parameter! p raw))
-    ;; Then, check again using the page validators
-    (iter (for v in (validators page))
-          (for fn = (car v))
-          (for pnames = (cdr v))
-          (for params = (remove-if-not (lambda (x)
-                                         (member x pnames))
-                                       (parameters page)
-                                       :key #'name))
-          
-          (unless (and (every #'validp params)
-                       (apply fn (mapcar #'val params)))
-            (mapc #'unbind-parameter! params)))))
+          (for raw = (cdr (assoc (string-downcase (name p)) query-alist :test #'string-equal)))
+          (parse-parameter p raw))
+    (iter (for p in (parameters page))
+          (validate-parameter p))))
 
 
 
@@ -186,16 +176,45 @@
 ;;; Utilities
 ;;; ------------------------------------------------------------
 
-(defun find-parameter (name &optional (page *page*)) 
+(defun find-parameter (name &optional (page *page*))
   (find name (parameters page) :key (if (keywordp name) #'key #'name)))
 
 (defun val* (param)
-  (cond 
+  (cond
     ;; parameter is null or it is not supplied: return nil
     ((or (null param) (not (suppliedp param)))
      nil)
-    ;; parameter supplied but erroneous: return raw 
+    ;; parameter supplied but erroneous: return raw
     ((not (validp param))
      (raw param))
     ;; parameter supplied and ok: return val
     (t (val param))))
+
+
+
+
+;; (defun bind-parameter! (p raw)
+;;   (handler-case (let ((parsed (parse-raw raw (lisp-type p))))
+;;                   (cond
+;;                     ;; parameter not supplied
+;;                     ((null raw)
+;;                      (setf (val p) nil
+;;                            (raw p) raw
+;;                            (suppliedp p) nil))
+;;                     ;; parameter supplied
+;;                     ;; Exception: we accept boolean parameters with parsed value = NIL
+;;                     ((or (funcall (vfn p) parsed)
+;;                          (and (eql 'boolean (lisp-type p))
+;;                               (member parsed '(t nil))))
+;;                      (setf (val p) parsed
+;;                            (raw p) raw
+;;                            (validp p) t
+;;                            (suppliedp p) t))
+;;                     ;; parameter supplied but it is invalid
+;;                     (t (error 'validation-error
+;;                               :raw-value raw))))
+;;     (validation-error ()
+;;       (slot-makunbound p 'val)
+;;       (setf (raw p) raw
+;;             (validp p) nil
+;;             (suppliedp p) t))))

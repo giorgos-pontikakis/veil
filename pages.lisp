@@ -9,7 +9,7 @@
 (defclass page ()
   ((name     :accessor name     :initarg :name)
    (key      :accessor key      :initarg :key)
-   (webapp   :reader   webapp) 
+   (webapp   :reader   webapp)
    (base-url :accessor base-url :initarg :base-url)))
 
 
@@ -46,11 +46,13 @@ object). Return the page object. "
        (declare (ignorable fragment))
        (let ((,page (find-page ',page-name))
              (,param-value-alist (iter (for arg in ',arguments)
-                                       (for val in (list ,@arguments)) 
+                                       (for val in (list ,@arguments))
                                        (when val
                                          (collect (cons arg val))))))
-         (url (base-url ,page)
-              (make-query-string ,param-value-alist))))))
+         (concatenate 'string
+                      (webroot (webapp ,page))
+                      (base-url ,page)
+                      (make-query-string ,param-value-alist))))))
 
 ;;; ----------------------------------------------------------------------
 ;;; Dynamic pages
@@ -58,69 +60,76 @@ object). Return the page object. "
 
 (defclass dynamic-page (page)
   ((request-type :accessor request-type :initarg :request-type)
-   (handler      :accessor handler      :initarg :handler) 
+   (handler      :accessor handler      :initarg :handler)
    (parameters   :accessor parameters   :initarg :parameters)
-   (validators   :accessor validators   :initarg :validators)
+   (tests        :accessor tests        :initarg :tests)
    (body         :accessor body         :initarg :body)))
 
 (defmethod publisher ((page dynamic-page))
-  #'(lambda () 
+  #'(lambda ()
       (setf (gethash (name page)
                      (dispatch-table (webapp page)))
             ;; this is the dispatcher
-            #'(lambda (request) 
+            #'(lambda (request)
                 (if (string-equal (full-url (name page))
                                   (script-name request))
                     (handler page)
                     nil)))))
 
 (defmethod handler ((page dynamic-page))
-  #'(lambda () 
+  #'(lambda ()
       (let ((*page* page))
         (declare (special *page*))
-        (bind-parameters! page) 
+        (set-parameters page)
         (let ((output (with-output-to-string (*standard-output*)
-                        (apply (body page) (parameters page))))) 
+                        (apply (body page) (parameters page)))))
           output))))
 
-(defun build-parameter-list (spec)
-  (mapcar (lambda (spec1)
+(defun build-parameter-list (page specs)
+  (mapcar (lambda (spec)
             (destructuring-bind (name &optional
                                       (lisp-type 'string)
-                                      validator
-                                      requiredp) (ensure-list spec1)
+                                      vspec
+                                      requiredp) (ensure-list spec)
+
               `(make-instance 'http-parameter
                               :name ',name
+                              :page ,page
                               :key (make-keyword ',name)
                               :lisp-type ',lisp-type
-                              :validator ,(or validator '#'identity)
-                              :requiredp ,requiredp)))
-          spec))
+                              :vfn ,(cond ((consp vspec) `(symbol-function ',(first vspec)))
+                                          ((null vspec) '(constantly t))
+                                          (t `(symbol-function ',vspec)))
+                              :vargs ',(cond ((consp vspec) (rest vspec))
+                                             ((null vspec) nil)
+                                             (t (list name)))
+                              :requiredp ',requiredp)))
+          specs))
+
 
 (defun build-parameter-names (spec)
   (mapcar #'first (mapcar #'ensure-list spec)))
 
-(defmacro define-dynamic-page (name (&rest param-spec)
-			       (base-url &key 
-					 (request-type :get)
-					 validators
-                                         webapp)
-			       &body body)
-  (let ((parameter-names (build-parameter-names param-spec)))
-    `(progn
-       (register-page
-        (make-instance 'dynamic-page
-                       :name ',name
-                       :key (make-keyword ',name)
-                       :base-url ,base-url 
-                       :request-type ,request-type
-                       :parameters (list ,@(build-parameter-list param-spec))
-                       :validators ',validators
-                       :body (lambda (,@parameter-names) 
-                               ,@body))
-        (or ,webapp *webapp*))
-       (define-page-fn ,name ,parameter-names)
-       (publish-page ',name))))
+(defmacro define-dynamic-page (name (base-url &key
+                                              (request-type :get)
+                                              webapp)
+                               (&rest param-specs) &body body)
+  (with-gensyms (page parameters)
+    (let ((parameter-names (build-parameter-names param-specs)))
+      `(let* ((,page (make-instance 'dynamic-page
+                                    :name ',name
+                                    :key (make-keyword ',name)
+                                    :base-url ,base-url
+                                    :request-type ,request-type
+                                    :body (lambda (,@parameter-names)
+                                            ,@body)))
+              (,parameters (list ,@(build-parameter-list page param-specs))))
+         (setf (parameters ,page) ,parameters)
+         (register-page
+          ,page
+          (or ,webapp *webapp*))
+         (define-page-fn ,name ,parameter-names)
+         (publish-page ',name)))))
 
 
 
@@ -151,13 +160,13 @@ object). Return the page object. "
 
 (defun static-page-pathname (page)
   (let* ((split-base-url (split "/" (base-url page)))
-	 (static-directory (or (butlast split-base-url) (list "")))
-	 (static-filename (lastcar split-base-url))
-	 (webapp (webapp page)))
+         (static-directory (or (butlast split-base-url) (list "")))
+         (static-filename (lastcar split-base-url))
+         (webapp (webapp page)))
     (make-pathname* :file static-filename
-		    :dir (cons (root-path webapp)
-			       (cons (static-path webapp)
-				     static-directory)))))
+                    :dir (cons (root-path webapp)
+                               (cons (static-path webapp)
+                                     static-directory)))))
 
 
 ;; -- Build --
@@ -178,8 +187,8 @@ object). Return the page object. "
 
 (defun build-pages (&optional webapp)
   (iter (for page in (pages (ensure-webapp webapp)))
-	(%build-page page)
-	(collect (name page))))
+        (%build-page page)
+        (collect (name page))))
 
 
 ;; -- Publish --
@@ -192,16 +201,16 @@ object). Return the page object. "
 (defmethod %publish-page ((page dynamic-page))
   (funcall (publisher page)))
 
-(defmethod %publish-page ((page external-page)) 
+(defmethod %publish-page ((page external-page))
   (values))
 
 (defun publish-page (page-name &optional webapp)
   (%publish-page (find-page page-name (ensure-webapp webapp))))
 
-(defun publish-pages (&optional webapp) 
+(defun publish-pages (&optional webapp)
   (iter (for (nil page) in-hashtable (pages (ensure-webapp webapp)))
-	(%publish-page page)
-	(collect (name page))))
+        (%publish-page page)
+        (collect (name page))))
 
 
 ;; -- Unpublish --

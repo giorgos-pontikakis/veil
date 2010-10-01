@@ -2,16 +2,16 @@
 
 (defpackage :veil
   (:use :common-lisp
-	:lisputils
+        :lisputils
         :hunchentoot
-	:cl-who
-	:cl-ppcre
-	:iterate
-	:alexandria
-	:metabang-bind
-        :postmodern) 
+        :cl-who
+        :cl-ppcre
+        :iterate
+        :alexandria
+        :metabang-bind
+        :postmodern)
   (:export
-   ;; db 
+   ;; db
    :db
    :*db*
    :define-db
@@ -20,21 +20,21 @@
    ;; webapp class
    :webapp
    :*webapp*
-   :name	      
-   :root-path     
-   :static-path   
-   :pages	      
-   :port	      
-   :webroot	      
-   :debug-p	      
-   :acceptor      
-   :use-ssl-p	      
+   :name
+   :root-path
+   :static-path
+   :pages
+   :port
+   :webroot
+   :debug-p
+   :acceptor
+   :use-ssl-p
    :dispatch-table
    :published-p
    ;; webapp functions
    :define-webapp
    :publish-webapp
-   :unpublish-webapp 
+   :unpublish-webapp
    ;; page classes
    :page
    :*page*
@@ -43,9 +43,9 @@
    :base-url
    :content-type
    :request-type
-   :handler	    
-   :parameters  
-   :validators  
+   :handler
+   :parameters
+   :validators
    :body
    :path
    :builder
@@ -67,16 +67,16 @@
    ;; parameters
    :lisp->html
    :html->lisp
-   :lisp-type 
-   :validator
-   :requiredp
+   :lisp-type
    :val
    :raw
    :validp
    :suppliedp
+   :requiredp
+   :error-type
    :find-parameter
    :val*
-   ;; html 
+   ;; html
    :indent
    :with-html
    :defhtml
@@ -84,4 +84,3 @@
    :with-document
    :render
    :url))
-
