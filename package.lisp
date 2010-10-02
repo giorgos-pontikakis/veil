@@ -65,6 +65,9 @@
    :publish-page
    :publish-pages
    ;; parameters
+   :+html-true+
+   :+html-false+
+   :+html-null+
    :lisp->html
    :html->lisp
    :lisp-type

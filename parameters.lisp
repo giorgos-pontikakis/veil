@@ -30,7 +30,7 @@
 
 ;; lisp to html
 
-(defmethod lisp->html ((value t))
+(defmethod lisp->html ((value (eql t)))
   +html-true+)
 
 (defmethod lisp->html ((value (eql :null)))
