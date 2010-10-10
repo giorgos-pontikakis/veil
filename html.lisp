@@ -2,9 +2,6 @@
 
 (declaim (optimize (speed 0) (debug 3)))
 
-(defun indent ()
-  (debug-p *webapp*))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmacro with-html (&body body)
     ;; We return nil so that we can use this inside the render
@@ -30,19 +27,19 @@
     ((:xhtml nil)
      `(progn
         (setf (html-mode) :xml)
-        (with-html-output (*standard-output* nil :prologue t :indent (indent))
+        (with-html-output (*standard-output* nil :prologue t :indent t)
           (:html ,@html-params
             ,@body))))
     ((:html4)
      `(progn
         (setf (html-mode) :sgml)
-        (with-html-output (*standard-output* nil :prologue t :indent (indent))
+        (with-html-output (*standard-output* nil :prologue t :indent t)
           (:html ,@html-params
             ,@body))))
     ((:xml)
      `(progn
         (setf (html-mode) :xml)
-        (with-html-output (*standard-output* nil :prologue nil :indent (indent))
+        (with-html-output (*standard-output* nil :prologue nil :indent t)
           (fmt "<?xml version=\"1.0\" encoding=\"utf-8\"?>~&")
           (:html ,@html-params
             ,@body))))))
@@ -65,7 +62,6 @@ scheme and machine normally. "
     (unless (null args)
       (bind ((#(scheme machine nil script-name)
                (nth-value 1 (scan-to-strings "(https?:|ftp:)?(//[^/]+)?(/?)(.*)" (first args)))))
-
         (if machine
             (progn (princ (or scheme "http:"))
                    (princ machine)
@@ -73,6 +69,6 @@ scheme and machine normally. "
                    (princ script-name)
                    (mapc #'princ
                          (mapcar #'lisp->html (rest args))))
-            (progn (princ (webroot *webapp*))
+            (progn (princ (symbol-value (intern "*WEBAPP*" *package*)))
                    (mapc #'princ
                          (mapcar #'lisp->html args))))))))

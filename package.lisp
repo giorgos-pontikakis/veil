@@ -11,15 +11,15 @@
         :metabang-bind
         :postmodern)
   (:export
+   :pack
    ;; db
    :db
-   :*db*
    :define-db
    :with-db
    :select-dao-unique
    ;; webapp class
+   :*webapps*
    :webapp
-   :*webapp*
    :name
    :root-path
    :static-path
@@ -33,13 +33,13 @@
    :published-p
    ;; webapp functions
    :define-webapp
+   :find-webapp
+   :register-webapp
    :publish-webapp
    :unpublish-webapp
    ;; page classes
    :page
-   :*page*
    :key
-   :webapp
    :base-url
    :content-type
    :request-type

@@ -3,18 +3,19 @@
 (declaim (optimize (speed 0) (debug 3)))
 
 ;;; ----------------------------------------------------------------------
-;;; Web applications class
+;;; Web Application class
 ;;; ----------------------------------------------------------------------
 
 (defclass webapp ()
   ((name           :accessor name           :initarg  :name)
+   (pack           :accessor pack           :initarg  :pack)
    (root-path      :accessor root-path      :initarg  :root-path)
    (static-path    :accessor static-path    :initarg  :static-path)
    (pages          :reader   pages          :initform (make-hash-table))
    (port           :accessor port           :initarg  :port)
    (webroot        :accessor webroot        :initarg  :webroot)
    (debug-p        :accessor debug-p        :initarg  :debug-p)
-   (acceptor-obj       :accessor acceptor-obj       :initarg  :acceptor-obj)
+   (acceptor-obj   :accessor acceptor-obj   :initarg  :acceptor-obj)
    (use-ssl-p      :reader   use-ssl-p      :initarg  :use-ssl-p)
    (dispatch-table :reader   dispatch-table :initform (make-hash-table))
    (published-p    :accessor published-p    :initarg  :published-p))
@@ -33,19 +34,28 @@
                            :name (name webapp))))
   (setf (published-p webapp) nil))
 
+(defparameter *webapps* nil)
+
 (defparameter *webapp* nil)
 
+(defun find-webapp (name)
+  (find name *webapps* :key #'name))
+
+(defun register-webapp (webapp)
+  (pushnew webapp *webapps* :key #'name))
+
 (defmacro define-webapp (parameter &body body)
-  `(progn
-     (defvar ,parameter (make-instance 'webapp ,@body))
-     (publish-webapp ,parameter)
-     (publish-pages ,parameter)
-     (setf *webapp* ,parameter)))
+  (with-gensyms (webapp)
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       (defvar ,parameter (make-instance 'webapp :pack *package* ,@body))
+       (register-webapp ,parameter))))
 
 (defun ensure-webapp (webapp)
-  (cond ((and webapp (typep webapp 'webapp)) webapp)
-        ((and *webapp* (typep *webapp* 'webapp)) *webapp*)
-        (t (error "Webapp not found"))))
+  (cond ((and webapp (typep webapp 'webapp))
+         webapp)
+        ((and webapp (symbolp webapp) (find-webapp webapp)))
+        (t
+         (error "Webapp not found"))))
 
 
 
@@ -60,7 +70,7 @@
           (start (acceptor-obj app))
           (setf (published-p app) t)
           t)
-        (warn "Webapp has already been published"))))
+        (warn "Nothing to do: Webapp has already been published."))))
 
 (defun unpublish-webapp (&optional webapp)
   (let ((app (ensure-webapp webapp)))
@@ -69,7 +79,7 @@
           (stop (acceptor-obj app))
           (setf (published-p app) nil)
           t)
-        (warn "Webapp has not been published."))))
+        (warn "Nothing to do: Webapp has not been published."))))
 
 ;; Note: The default Hunchentoot list-request-dispatcher contains a
 ;; list of functions with no indication of the page that they
@@ -88,9 +98,10 @@
 hash table as the dispatch table of the webapp object, instead of
 the *dispatch-table* list."
   (lambda (request)
-    (iter (for (nil dispatcher) in-hashtable (dispatch-table webapp))
-          (for action = (funcall dispatcher request))
-          (when action
-            (return (funcall action)))
-          (finally (setf (return-code* *reply*)
-                         +http-not-found+)))))
+    (let ((*package* (pack webapp)))
+      (iter (for (nil dispatcher) in-hashtable (dispatch-table webapp))
+            (for action = (funcall dispatcher request))
+            (when action
+              (return (funcall action)))
+            (finally (setf (return-code* *reply*)
+                           +http-not-found+))))))
