@@ -27,7 +27,7 @@
    :port
    :webroot
    :debug-p
-   :acceptor
+   :acceptor-obj
    :use-ssl-p
    :dispatch-table
    :published-p
@@ -60,6 +60,9 @@
    :register-page
    :unregister-page
    :define-dynamic-page
+   :define-regex-page
+   :define-static-page
+   :with-registers
    :build-page
    :build-pages
    :publish-page

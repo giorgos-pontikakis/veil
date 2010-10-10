@@ -118,9 +118,8 @@
 ;;; ----------------------------------------------------------------------
 
 (defun find-params (page names)
-  ;; Beware, future self: We have to iterate instead of using
-  ;; remove-if-not or something similar because we have to keep the
-  ;; order of the parameters unchanged
+  ;; We iterate instead of using remove-if-not or something similar so
+  ;; that wekeep the order of the parameters unchanged
   (let ((parameters (parameters page)))
     (iter (for n in names)
           (collect (find n parameters :key #'name)))))
@@ -189,32 +188,3 @@
      (raw param))
     ;; parameter supplied and ok: return val
     (t (val param))))
-
-
-
-
-;; (defun bind-parameter! (p raw)
-;;   (handler-case (let ((parsed (parse-raw raw (lisp-type p))))
-;;                   (cond
-;;                     ;; parameter not supplied
-;;                     ((null raw)
-;;                      (setf (val p) nil
-;;                            (raw p) raw
-;;                            (suppliedp p) nil))
-;;                     ;; parameter supplied
-;;                     ;; Exception: we accept boolean parameters with parsed value = NIL
-;;                     ((or (funcall (vfn p) parsed)
-;;                          (and (eql 'boolean (lisp-type p))
-;;                               (member parsed '(t nil))))
-;;                      (setf (val p) parsed
-;;                            (raw p) raw
-;;                            (validp p) t
-;;                            (suppliedp p) t))
-;;                     ;; parameter supplied but it is invalid
-;;                     (t (error 'validation-error
-;;                               :raw-value raw))))
-;;     (validation-error ()
-;;       (slot-makunbound p 'val)
-;;       (setf (raw p) raw
-;;             (validp p) nil
-;;             (suppliedp p) t))))

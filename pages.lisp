@@ -7,11 +7,18 @@
 ;;; ----------------------------------------------------------------------
 
 (defclass page ()
-  ((name     :accessor name     :initarg :name)
-   (key      :accessor key      :initarg :key)
-   (webapp   :reader   webapp)
-   (base-url :accessor base-url :initarg :base-url)))
+  ((name         :accessor name         :initarg :name)
+   (key          :accessor key          :initarg :key)
+   (webapp       :reader   webapp)
+   (base-url     :accessor base-url     :initarg :base-url)
+   (content-type :accessor content-type :initarg :content-type)
+   (body         :accessor body         :initarg :body)
+   (request-type :accessor request-type :initarg :request-type)
+   (parameters   :accessor parameters   :initarg :parameters)))
 
+(defgeneric publisher (page)
+  (:documentation "Return a function which, when called, returns the
+  dispatcher for a page"))
 
 (defun find-page (name &optional webapp)
   "Take the page name (a symbol) and a webapp designator (symbol or
@@ -54,36 +61,15 @@ object). Return the page object. "
                       (base-url ,page)
                       (make-query-string ,param-value-alist))))))
 
+
+
 ;;; ----------------------------------------------------------------------
-;;; Dynamic pages
+;;; Dynamic and regex pages
 ;;; ----------------------------------------------------------------------
 
-(defclass dynamic-page (page)
-  ((request-type :accessor request-type :initarg :request-type)
-   (handler      :accessor handler      :initarg :handler)
-   (parameters   :accessor parameters   :initarg :parameters)
-   (tests        :accessor tests        :initarg :tests)
-   (body         :accessor body         :initarg :body)))
-
-(defmethod publisher ((page dynamic-page))
-  #'(lambda ()
-      (setf (gethash (name page)
-                     (dispatch-table (webapp page)))
-            ;; this is the dispatcher
-            #'(lambda (request)
-                (if (string-equal (full-url (name page))
-                                  (script-name request))
-                    (handler page)
-                    nil)))))
-
-(defmethod handler ((page dynamic-page))
-  #'(lambda ()
-      (let ((*page* page))
-        (declare (special *page*))
-        (set-parameters page)
-        (let ((output (with-output-to-string (*standard-output*)
-                        (apply (body page) (parameters page)))))
-          output))))
+(defgeneric handler (page &key)
+  (:documentation "Return a function which, when called, returns the
+  handler for a page of class dynamic-page or its subclasses"))
 
 (defun build-parameter-list (page specs)
   (mapcar (lambda (spec)
@@ -91,7 +77,6 @@ object). Return the page object. "
                                       (lisp-type 'string)
                                       vspec
                                       requiredp) (ensure-list spec)
-
               `(make-instance 'http-parameter
                               :name ',name
                               :page ,page
@@ -110,8 +95,36 @@ object). Return the page object. "
 (defun build-parameter-names (spec)
   (mapcar #'first (mapcar #'ensure-list spec)))
 
+
+
+;;; --- Dynamic pages ---
+
+(defclass dynamic-page (page)
+  ())
+
+(defmethod publisher ((page dynamic-page))
+  #'(lambda ()
+      (setf (gethash (name page)
+                     (dispatch-table (webapp page)))
+            (lambda (request)
+              (if (string-equal (full-url (name page))
+                                (script-name request))
+                  (progn
+                    (set-parameters page)
+                    (handler page))
+                  nil)))))
+
+(defmethod handler ((page dynamic-page) &key)
+  #'(lambda ()
+      (let ((*page* page))
+        (declare (special *page*))
+        (with-output-to-string (*standard-output*)
+          (apply (body page) (parameters page))))))
+
+
 (defmacro define-dynamic-page (name (base-url &key
                                               (request-type :get)
+                                              (content-type *default-content-type*)
                                               webapp)
                                (&rest param-specs) &body body)
   (with-gensyms (page parameters)
@@ -121,24 +134,70 @@ object). Return the page object. "
                                     :key (make-keyword ',name)
                                     :base-url ,base-url
                                     :request-type ,request-type
+                                    :content-type ,content-type
                                     :body (lambda (,@parameter-names)
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
+         (register-page ,page
+                        (or ,webapp *webapp*))
          (setf (parameters ,page) ,parameters)
-         (register-page
-          ,page
-          (or ,webapp *webapp*))
          (define-page-fn ,name ,parameter-names)
          (publish-page ',name)))))
 
 
 
-;;; ----------------------------------------------------------------------
-;;; External pages
-;;; ----------------------------------------------------------------------
+;;; --- Regex pages ---
 
-(defclass external-page (page)
-  ((request-type :accessor request-type :initarg :request-type)))
+(defclass regex-page (dynamic-page)
+  ((scanner :accessor scanner :initarg :scanner)))
+
+(defmethod publisher ((page regex-page))
+  (lambda ()
+    (setf (gethash (name page)
+                   (dispatch-table (webapp page)))
+          (lambda (request)
+            (multiple-value-bind (match regs) (scan-to-strings (scanner page)
+                                                               (script-name request))
+              (if match
+                  (progn
+                    (set-parameters page)
+                    (handler page :register-values (coerce regs 'list)))
+                  nil))))))
+
+(defmethod handler ((page regex-page) &key register-values)
+  #'(lambda ()
+      (let ((*page* page))
+        (declare (special *page*))
+        (with-output-to-string (*standard-output*)
+          (apply (body page)
+                 (append (parameters page) register-values))))))
+
+(defmacro define-regex-page (name (base-url &key
+                                            (request-type :get)
+                                            (content-type *default-content-type*)
+                                            registers
+                                            webapp)
+                             (&rest param-specs) &body body)
+  (with-gensyms (page parameters)
+    (let ((parameter-names (build-parameter-names param-specs)))
+      `(let* ((,page (make-instance 'regex-page
+                                    :name ',name
+                                    :key (make-keyword ',name)
+                                    :base-url ,base-url
+                                    :request-type ,request-type
+                                    :content-type ,content-type
+                                    :body (lambda (,@parameter-names ,@registers)
+                                            ,@body)))
+              (,parameters (list ,@(build-parameter-list page param-specs))))
+         (register-page ,page
+                        (or ,webapp *webapp*))
+         (setf (parameters ,page) ,parameters)
+         (setf (scanner ,page)
+               (create-scanner (concatenate 'string
+                                            "^"
+                                            (full-url (name ,page)))))
+         (define-page-fn ,name ,parameter-names)
+         (publish-page ',name)))))
 
 
 
@@ -147,16 +206,59 @@ object). Return the page object. "
 ;;; ----------------------------------------------------------------------
 
 (defclass static-page (page)
-  ((content-type :accessor content-type :initarg :content-type)
-   (path         :accessor path         :initarg :path)
-   (builder      :accessor builder      :initarg :builder)
-   (publisher    :accessor publisher    :initarg :publisher)))
+  ((path         :accessor path         :initarg :path)))
 
+(defmethod publisher ((page static-page))
+  (lambda ()
+    (setf (gethash (name page)
+                   (dispatch-table (webapp page)))
+          (lambda (request)
+            (if (string-equal (full-url (name page))
+                              (script-name request))
+                (handle-static-file (path page) (content-type page))
+                nil)))))
 
+(defgeneric builder (page)
+  (:documentation "Return a function which, when called, writes the
+  body of the page to the path of the page"))
 
-;; ----------------------------------------------------------------------
-;; Build, Publish and Unpublish
-;; ----------------------------------------------------------------------
+(defmethod builder ((page static-page))
+  (lambda ()
+    (ensure-directories-exist (pathname page))
+    (with-open-file (stream (pathname page)
+                            :element-type 'base-char
+                            :direction :output
+                            :if-does-not-exist :create
+                            :if-exists :supersede)
+      (let ((*standard-output* stream))
+        (render (body page))))))
+
+(defmacro define-static-page (name (base-url &key
+                                             (request-type :get)
+                                             (content-type *default-content-type*)
+                                             webapp
+                                             path)
+                              (&rest param-specs)
+                              &body body)
+  (with-gensyms (page parameters)
+    (let ((parameter-names (build-parameter-names param-specs)))
+      `(let* ((,page (make-instance 'static-page
+                                    :name ',name
+                                    :key (make-keyword ',name)
+                                    :base-url ,base-url
+                                    :path ,path
+                                    :request-type ,request-type
+                                    :content-type ,content-type
+                                    :body (lambda ()
+                                            ,@body)))
+              (,parameters (list ,@(build-parameter-list page param-specs))))
+         (setf (parameters ,page) ,parameters)
+         (register-page ,page
+                        (or ,webapp *webapp*))
+         (unless (path ,page)
+           (setf (path ,page) (static-page-pathname ,page)))
+         (define-page-fn ,name ,parameter-names)
+         (publish-page ',name)))))
 
 (defun static-page-pathname (page)
   (let* ((split-base-url (split "/" (base-url page)))
@@ -168,48 +270,51 @@ object). Return the page object. "
                                (cons (static-path webapp)
                                      static-directory)))))
 
+;; ----------------------------------------------------------------------
+;; Build, Publish and Unpublish
+;; ----------------------------------------------------------------------
 
 ;; -- Build --
 
-(defgeneric %build-page (page))
+;; (defgeneric %build-page (page))
 
-(defmethod %build-page ((page static-page))
-  (funcall (builder page) (static-page-pathname page)))
+;; (defmethod %build-page ((page static-page))
+;;   (funcall (builder page) (static-page-pathname page)))
 
-(defmethod %build-page ((page dynamic-page))
-  (values))
+;; (defmethod %build-page ((page dynamic-page))
+;;   (values))
 
-(defmethod %build-page ((page external-page))
-  (values))
+;; (defmethod %build-page ((page external-page))
+;;   (values))
 
 (defun build-page (page-name &optional webapp)
-  (%build-page (find-page page-name (ensure-webapp webapp))))
+  (funcall (builder (find-page page-name (ensure-webapp webapp)))))
 
 (defun build-pages (&optional webapp)
   (iter (for page in (pages (ensure-webapp webapp)))
-        (%build-page page)
+        (build-page page)
         (collect (name page))))
 
 
 ;; -- Publish --
 
-(defgeneric %publish-page (page))
+;; (defgeneric %publish-page (page))
 
-(defmethod %publish-page ((page static-page))
-  (funcall (publisher page) (static-page-pathname page)))
+;; (defmethod %publish-page ((page static-page))
+;;   (funcall (publisher page) (static-page-pathname page)))
 
-(defmethod %publish-page ((page dynamic-page))
-  (funcall (publisher page)))
+;; (defmethod %publish-page ((page dynamic-page))
+;;   (funcall (publisher page)))
 
-(defmethod %publish-page ((page external-page))
-  (values))
+;; (defmethod %publish-page ((page external-page))
+;;   (values))
 
 (defun publish-page (page-name &optional webapp)
-  (%publish-page (find-page page-name (ensure-webapp webapp))))
+  (funcall (publisher (find-page page-name (ensure-webapp webapp)))))
 
 (defun publish-pages (&optional webapp)
   (iter (for (nil page) in-hashtable (pages (ensure-webapp webapp)))
-        (%publish-page page)
+        (publish-page page)
         (collect (name page))))
 
 

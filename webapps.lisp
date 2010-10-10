@@ -14,14 +14,14 @@
    (port           :accessor port           :initarg  :port)
    (webroot        :accessor webroot        :initarg  :webroot)
    (debug-p        :accessor debug-p        :initarg  :debug-p)
-   (acceptor       :accessor acceptor       :initarg  :acceptor)
+   (acceptor-obj       :accessor acceptor-obj       :initarg  :acceptor-obj)
    (use-ssl-p      :reader   use-ssl-p      :initarg  :use-ssl-p)
    (dispatch-table :reader   dispatch-table :initform (make-hash-table))
    (published-p    :accessor published-p    :initarg  :published-p))
   (:default-initargs :use-ssl-p nil))
 
 (defmethod initialize-instance :after ((webapp webapp) &key)
-  (setf (acceptor webapp)
+  (setf (acceptor-obj webapp)
         (if (use-ssl-p webapp)
             (make-instance 'ssl-acceptor
                            :port (port webapp)
@@ -57,7 +57,7 @@
   (let ((app (ensure-webapp webapp)))
     (if (not (published-p app))
         (progn
-          (start (acceptor app))
+          (start (acceptor-obj app))
           (setf (published-p app) t)
           t)
         (warn "Webapp has already been published"))))
@@ -66,7 +66,7 @@
   (let ((app (ensure-webapp webapp)))
     (if (published-p app)
         (progn
-          (stop (acceptor app))
+          (stop (acceptor-obj app))
           (setf (published-p app) nil)
           t)
         (warn "Webapp has not been published."))))
