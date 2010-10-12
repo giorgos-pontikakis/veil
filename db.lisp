@@ -11,19 +11,20 @@
    (dbpass  :accessor dbpass  :initarg :dbpass)
    (adapter :accessor adapter :initarg :adapter)))
 
-(defparameter *db* nil)
-
 (defmacro define-db (parameter &body body)
   `(progn
-     (defvar ,parameter (make-instance 'db ,@body))
-     (setf *db* ,parameter)))
+     (defvar ,parameter (make-instance 'db ,@body))))
 
 
 ;;; Utilities
 
-(defmacro with-db ((&optional (db *db*)) &body body)
-  `(with-connection (list (dbname *db*) (dbuser *db*) (dbpass *db*) (dbhost *db*))
-     ,@body))
+(defmacro with-db ((&optional db) &body body)
+  (with-gensyms (db)
+    `(with-connection (list (dbname (symbol-value (intern "*DB*")))
+                            (dbuser (symbol-value (intern "*DB*")))
+                            (dbpass (symbol-value (intern "*DB*")))
+                            (dbhost (symbol-value (intern "*DB*"))))
+       ,@body)))
 
 (defmacro select-dao-unique (type &optional (test t) &rest ordering)
   (with-gensyms (dao)

@@ -20,38 +20,35 @@
   (:documentation "Return a function which, when called, returns the
   dispatcher for a page"))
 
-(defun find-page (name &optional webapp)
+(defun find-page (name webapp)
   "Take the page name (a symbol) and a webapp designator (symbol or
 object). Return the page object. "
   (gethash name (pages (ensure-webapp webapp))))
 
-(defun register-page (page &optional webapp)
+(defun register-page (page webapp)
   "Add a page to a webapp's pages"
   (let ((app (ensure-webapp webapp)))
     (setf (slot-value page 'webapp) app)
     (setf (gethash (name page) (pages app))
           page)))
 
-(defun unregister-page (page-name &optional (webapp *webapp*))
+(defun unregister-page (page-name webapp)
   "Remove a page from a webapp's pages"
   (let ((page (find-page page-name webapp)))
     (if page
         (remhash (name page) (pages (webapp page)))
         (error "Page ~A not found." page-name))))
 
-(defun full-url (page-name &optional (webapp *webapp*))
-  (let ((page (find-page page-name webapp)))
-    (if page
-        (concatenate 'string (webroot (webapp page)) (base-url page))
-        (error "Page ~A not found." page-name))))
+(defun full-url (page)
+  (concatenate 'string (webroot (webapp page)) (base-url page)))
 
 (defparameter *page* nil)
 
-(defmacro define-page-fn (page-name &optional arguments)
+(defmacro define-page-fn (page-name webapp &optional arguments)
   (with-gensyms (page param-value-alist)
     `(defun ,page-name ,(cons '&key (append arguments (list 'fragment)))
        (declare (ignorable fragment))
-       (let ((,page (find-page ',page-name))
+       (let ((,page (find-page ',page-name ,webapp))
              (,param-value-alist (iter (for arg in ',arguments)
                                        (for val in (list ,@arguments))
                                        (when val
@@ -107,7 +104,7 @@ object). Return the page object. "
       (setf (gethash (name page)
                      (dispatch-table (webapp page)))
             (lambda (request)
-              (if (string-equal (full-url (name page))
+              (if (string-equal (full-url page)
                                 (script-name request))
                   (progn
                     (set-parameters page)
@@ -128,7 +125,7 @@ object). Return the page object. "
                                (&rest param-specs) &body body)
   (with-gensyms (page parameters)
     (let ((parameter-names (build-parameter-names param-specs)))
-      `(let* ((*webapp* (find-webapp ',webapp-name))
+      `(let* ((,(intern "*WEBAPP*") (find-webapp ',webapp-name))
               (,page (make-instance 'dynamic-page
                                     :name ',name
                                     :key (make-keyword ',name)
@@ -138,10 +135,10 @@ object). Return the page object. "
                                     :body (lambda (,@parameter-names)
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
-         (register-page ,page *webapp*)
+         (register-page ,page ,(intern "*WEBAPP*"))
          (setf (parameters ,page) ,parameters)
-         (define-page-fn ,name ,parameter-names)
-         (publish-page ',name)))))
+         (define-page-fn ,name ,(intern "*WEBAPP*") ,parameter-names)
+         (publish-page ',name ,(intern "*WEBAPP*"))))))
 
 
 
@@ -179,7 +176,7 @@ object). Return the page object. "
                              (&rest param-specs) &body body)
   (with-gensyms (page parameters)
     (let ((parameter-names (build-parameter-names param-specs)))
-      `(let* ((*webapp* (find-webapp ',webapp-name))
+      `(let* ((,(intern "*WEBAPP*") (find-webapp ',webapp-name))
               (,page (make-instance 'regex-page
                                     :name ',name
                                     :key (make-keyword ',name)
@@ -189,14 +186,14 @@ object). Return the page object. "
                                     :body (lambda (,@parameter-names ,@registers)
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
-         (register-page ,page *webapp*)
+         (register-page ,page ,(intern "*WEBAPP*"))
          (setf (parameters ,page) ,parameters)
          (setf (scanner ,page)
                (create-scanner (concatenate 'string
                                             "^"
-                                            (full-url (name ,page)))))
-         (define-page-fn ,name ,parameter-names)
-         (publish-page ',name)))))
+                                            (full-url ,page))))
+         (define-page-fn ,name ,(intern "*WEBAPP*") ,parameter-names)
+         (publish-page ',name ,(intern "*WEBAPP*"))))))
 
 
 
@@ -212,7 +209,7 @@ object). Return the page object. "
     (setf (gethash (name page)
                    (dispatch-table (webapp page)))
           (lambda (request)
-            (if (string-equal (full-url (name page) (webapp page))
+            (if (string-equal (full-url page)
                               (script-name request))
                 (handle-static-file (path page) (content-type page))
                 nil)))))
@@ -241,7 +238,7 @@ object). Return the page object. "
                               &body body)
   (with-gensyms (page parameters)
     (let ((parameter-names (build-parameter-names param-specs)))
-      `(let* ((*webapp* (find-webapp ',webapp-name))
+      `(let* ((,(intern "*WEBAPP*") (find-webapp ',webapp-name))
               (,page (make-instance 'static-page
                                     :name ',name
                                     :key (make-keyword ',name)
@@ -253,11 +250,11 @@ object). Return the page object. "
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
          (setf (parameters ,page) ,parameters)
-         (register-page ,page *webapp*)
+         (register-page ,page ,(intern "*WEBAPP*"))
          (unless (path ,page)
            (setf (path ,page) (static-page-pathname ,page)))
-         (define-page-fn ,name ,parameter-names)
-         (publish-page ',name)))))
+         (define-page-fn ,name ,(intern "*WEBAPP*") ,parameter-names)
+         (publish-page ',name ,(intern "*WEBAPP*"))))))
 
 (defun static-page-pathname (page)
   (let* ((split-base-url (split "/" (base-url page)))
@@ -286,10 +283,10 @@ object). Return the page object. "
 ;; (defmethod %build-page ((page external-page))
 ;;   (values))
 
-(defun build-page (page-name &optional (webapp *webapp*))
-  (funcall (builder (find-page page-name (ensure-webapp webapp)))))
+(defun build-page (page-name webapp)
+  (funcall (builder (find-page page-name webapp))))
 
-(defun build-pages (&optional (webapp *webapp*))
+(defun build-pages (webapp)
   (let ((app (ensure-webapp webapp)))
     (iter (for page in (pages app))
           (build-page page app)
@@ -309,11 +306,11 @@ object). Return the page object. "
 ;; (defmethod %publish-page ((page external-page))
 ;;   (values))
 
-(defun publish-page (page-name &optional (webapp *webapp*))
-  (funcall (publisher (find-page page-name (ensure-webapp webapp)))))
+(defun publish-page (page-name webapp)
+  (funcall (publisher (find-page page-name webapp))))
 
-(defun publish-pages (&optional (webapp *webapp*))
-  (iter (for (nil page) in-hashtable (pages (ensure-webapp webapp)))
+(defun publish-pages (webapp)
+  (iter (for (nil page) in-hashtable (pages webapp))
         (publish-page page)
         (collect (name page))))
 
@@ -326,6 +323,6 @@ object). Return the page object. "
 
 ;; -- Published pages --
 
-(defun published-pages (&optional (webapp *webapp*))
+(defun published-pages (webapp)
   (iter (for (name nil) in-hashtable (dispatch-table (ensure-webapp webapp)))
         (collect name)))

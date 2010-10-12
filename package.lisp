@@ -55,7 +55,6 @@
    :dynamic-page
    :static-page
    :external-page
-   :full-url
    :find-page
    :register-page
    :unregister-page

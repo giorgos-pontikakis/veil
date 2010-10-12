@@ -3,6 +3,29 @@
 (declaim (optimize (speed 0) (debug 3)))
 
 ;;; ----------------------------------------------------------------------
+;;; Default Hunchentoot configuration
+;;; ----------------------------------------------------------------------
+(setf *hunchentoot-default-external-format* (flexi-streams:make-external-format :utf-8))
+(setf *default-content-type* "text/html; charset=UTF-8")
+(setf *use-user-agent-for-sessions* t)
+(setf *use-remote-addr-for-sessions* t)
+(setf *show-lisp-errors-p* t)
+(setf *log-lisp-errors-p* t)
+(setf *log-lisp-warnings-p* t)
+
+
+
+;;; ----------------------------------------------------------------------
+;;; Default CL-WHO configuration
+;;; ----------------------------------------------------------------------
+(setf *escape-char-p*
+      #'(lambda (char)
+          (find char "<>&'\"")))
+(setf (html-mode) :xml)
+
+
+
+;;; ----------------------------------------------------------------------
 ;;; Web Application class
 ;;; ----------------------------------------------------------------------
 
@@ -36,8 +59,6 @@
 
 (defparameter *webapps* nil)
 
-(defparameter *webapp* nil)
-
 (defun find-webapp (name)
   (find name *webapps* :key #'name))
 
@@ -48,6 +69,7 @@
   (with-gensyms (webapp)
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (defvar ,parameter (make-instance 'webapp :pack *package* ,@body))
+       (publish-webapp ,parameter)
        (register-webapp ,parameter))))
 
 (defun ensure-webapp (webapp)

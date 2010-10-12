@@ -69,6 +69,6 @@ scheme and machine normally. "
                    (princ script-name)
                    (mapc #'princ
                          (mapcar #'lisp->html (rest args))))
-            (progn (princ (symbol-value (intern "*WEBAPP*" *package*)))
+            (progn (princ (webroot (symbol-value (intern "*WEBAPP*"))))
                    (mapc #'princ
                          (mapcar #'lisp->html args))))))))
