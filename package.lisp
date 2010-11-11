@@ -14,13 +14,15 @@
    :pack
    ;; db
    :db
-   :define-db
+   ;; :define-db
    :with-db
    :select-dao-unique
    ;; webapp class
    :*webapps*
    :webapp
    :name
+   :pkg
+   :database
    :root-path
    :static-path
    :pages
@@ -37,6 +39,7 @@
    :register-webapp
    :publish-webapp
    :unpublish-webapp
+   :package-webapp
    ;; page classes
    :page
    :key
@@ -80,12 +83,4 @@
    :requiredp
    :error-type
    :find-parameter
-   :val*
-   ;; html
-   :indent
-   :with-html
-   :defhtml
-   :html
-   :with-document
-   :render
-   :url))
+   :val*))

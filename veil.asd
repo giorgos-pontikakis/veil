@@ -17,5 +17,4 @@
                (:file "webapps")
                (:file "pages")
                (:file "parameters")
-               (:file "db")
-               (:file "html")))
+               (:file "db")))

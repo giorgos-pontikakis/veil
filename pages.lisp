@@ -121,11 +121,11 @@ object). Return the page object. "
 (defmacro define-dynamic-page (name (base-url &key
                                               (request-type :get)
                                               (content-type *default-content-type*)
-                                              (webapp-name (intern (package-name *package*))))
+                                              webapp-name)
                                (&rest param-specs) &body body)
-  (with-gensyms (page parameters)
+  (with-gensyms (page parameters webapp)
     (let ((parameter-names (build-parameter-names param-specs)))
-      `(let* ((,(intern "*WEBAPP*") (find-webapp ',webapp-name))
+      `(let* ((,webapp (find-webapp ',webapp-name))
               (,page (make-instance 'dynamic-page
                                     :name ',name
                                     :key (make-keyword ',name)
@@ -135,10 +135,10 @@ object). Return the page object. "
                                     :body (lambda (,@parameter-names)
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
-         (register-page ,page ,(intern "*WEBAPP*"))
+         (register-page ,page (or ,webapp (package-webapp)))
          (setf (parameters ,page) ,parameters)
-         (define-page-fn ,name ,(intern "*WEBAPP*") ,parameter-names)
-         (publish-page ',name ,(intern "*WEBAPP*"))))))
+         (define-page-fn ,name (or ,webapp (package-webapp)) ,parameter-names)
+         (publish-page ',name (or ,webapp (package-webapp)))))))
 
 
 
@@ -172,11 +172,11 @@ object). Return the page object. "
                                             (request-type :get)
                                             (content-type *default-content-type*)
                                             registers
-                                            (webapp-name (intern (package-name *package*))))
+                                            webapp-name)
                              (&rest param-specs) &body body)
-  (with-gensyms (page parameters)
+  (with-gensyms (page parameters webapp)
     (let ((parameter-names (build-parameter-names param-specs)))
-      `(let* ((,(intern "*WEBAPP*") (find-webapp ',webapp-name))
+      `(let* ((,webapp (find-webapp ',webapp-name))
               (,page (make-instance 'regex-page
                                     :name ',name
                                     :key (make-keyword ',name)
@@ -186,14 +186,14 @@ object). Return the page object. "
                                     :body (lambda (,@parameter-names ,@registers)
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
-         (register-page ,page ,(intern "*WEBAPP*"))
+         (register-page ,page (or ,webapp (package-webapp)))
          (setf (parameters ,page) ,parameters)
          (setf (scanner ,page)
                (create-scanner (concatenate 'string
                                             "^"
                                             (full-url ,page))))
-         (define-page-fn ,name ,(intern "*WEBAPP*") ,parameter-names)
-         (publish-page ',name ,(intern "*WEBAPP*"))))))
+         (define-page-fn ,name (or ,webapp (package-webapp)) ,parameter-names)
+         (publish-page ',name (or ,webapp (package-webapp)))))))
 
 
 
@@ -220,25 +220,25 @@ object). Return the page object. "
 
 (defmethod builder ((page static-page))
   (lambda ()
-    (ensure-directories-exist (pathname page))
-    (with-open-file (stream (pathname page)
+    (ensure-directories-exist (path page))
+    (with-open-file (stream (path page)
                             :element-type 'base-char
                             :direction :output
                             :if-does-not-exist :create
                             :if-exists :supersede)
       (let ((*standard-output* stream))
-        (render (body page))))))
+        (funcall (body page))))))
 
 (defmacro define-static-page (name (base-url &key
                                              (request-type :get)
                                              (content-type *default-content-type*)
-                                             (webapp-name (intern (package-name *package*)))
+                                             webapp-name
                                              path)
                               (&rest param-specs)
                               &body body)
-  (with-gensyms (page parameters)
+  (with-gensyms (page parameters webapp)
     (let ((parameter-names (build-parameter-names param-specs)))
-      `(let* ((,(intern "*WEBAPP*") (find-webapp ',webapp-name))
+      `(let* ((,webapp (find-webapp ,webapp-name))
               (,page (make-instance 'static-page
                                     :name ',name
                                     :key (make-keyword ',name)
@@ -250,11 +250,11 @@ object). Return the page object. "
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
          (setf (parameters ,page) ,parameters)
-         (register-page ,page ,(intern "*WEBAPP*"))
+         (register-page ,page (or ,webapp (package-webapp)))
          (unless (path ,page)
            (setf (path ,page) (static-page-pathname ,page)))
-         (define-page-fn ,name ,(intern "*WEBAPP*") ,parameter-names)
-         (publish-page ',name ,(intern "*WEBAPP*"))))))
+         (define-page-fn ,name (or ,webapp (package-webapp)) ,parameter-names)
+         (publish-page ',name (or ,webapp (package-webapp)))))))
 
 (defun static-page-pathname (page)
   (let* ((split-base-url (split "/" (base-url page)))
@@ -283,14 +283,16 @@ object). Return the page object. "
 ;; (defmethod %build-page ((page external-page))
 ;;   (values))
 
-(defun build-page (page-name webapp)
-  (funcall (builder (find-page page-name webapp))))
+(defun build-page (page)
+  (funcall (builder page))
+  (values))
 
 (defun build-pages (webapp)
   (let ((app (ensure-webapp webapp)))
-    (iter (for page in (pages app))
-          (build-page page app)
-          (collect (name page)))))
+    (iter (for (nil page) in-hashtable (pages app))
+          (when (eql (type-of page) 'static-page)
+            (funcall (builder page))
+            (collect (name page))))))
 
 
 ;; -- Publish --
@@ -311,7 +313,7 @@ object). Return the page object. "
 
 (defun publish-pages (webapp)
   (iter (for (nil page) in-hashtable (pages webapp))
-        (publish-page page)
+        (publish-page page webapp)
         (collect (name page))))
 
 

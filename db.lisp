@@ -4,27 +4,28 @@
 
 ;;; Class definitions
 
-(defclass db ()
+(defclass database ()
   ((dbname  :accessor dbname  :initarg :dbname)
    (dbhost  :accessor dbhost  :initarg :dbhost)
    (dbuser  :accessor dbuser  :initarg :dbuser)
    (dbpass  :accessor dbpass  :initarg :dbpass)
    (adapter :accessor adapter :initarg :adapter)))
 
-(defmacro define-db (parameter &body body)
-  `(progn
-     (defvar ,parameter (make-instance 'db ,@body))))
+;; (defmacro define-db (parameter &body body)
+;;   `(progn
+;;      (defparameter ,parameter (make-instance 'db ,@body))))
 
 
 ;;; Utilities
 
-(defmacro with-db ((&optional db) &body body)
+(defmacro with-db ((&optional database) &body body)
   (with-gensyms (db)
-    `(with-connection (list (dbname (symbol-value (intern "*DB*")))
-                            (dbuser (symbol-value (intern "*DB*")))
-                            (dbpass (symbol-value (intern "*DB*")))
-                            (dbhost (symbol-value (intern "*DB*"))))
-       ,@body)))
+    `(let ((,db (or ,database (database (package-webapp)))))
+       (with-connection (list (dbname (or ,database ,db))
+                              (dbuser (or ,database ,db))
+                              (dbpass (or ,database ,db))
+                              (dbhost (or ,database ,db)))
+         ,@body))))
 
 (defmacro select-dao-unique (type &optional (test t) &rest ordering)
   (with-gensyms (dao)

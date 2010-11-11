@@ -31,7 +31,8 @@
 
 (defclass webapp ()
   ((name           :accessor name           :initarg  :name)
-   (pack           :accessor pack           :initarg  :pack)
+   (pkg            :accessor pkg            :initarg  :pkg)
+   (database       :accessor database       :initarg  :database)
    (root-path      :accessor root-path      :initarg  :root-path)
    (static-path    :accessor static-path    :initarg  :static-path)
    (pages          :reader   pages          :initform (make-hash-table))
@@ -55,7 +56,8 @@
                            :port (port webapp)
                            :request-dispatcher (make-hashtable-request-dispatcher webapp)
                            :name (name webapp))))
-  (setf (published-p webapp) nil))
+  (setf (published-p webapp) nil)
+  (setf (pkg webapp) *package*))
 
 (defparameter *webapps* nil)
 
@@ -66,11 +68,10 @@
   (pushnew webapp *webapps* :key #'name))
 
 (defmacro define-webapp (parameter &body body)
-  (with-gensyms (webapp)
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (defvar ,parameter (make-instance 'webapp :pack *package* ,@body))
-       (publish-webapp ,parameter)
-       (register-webapp ,parameter))))
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (defvar ,parameter (make-instance 'webapp ,@body))
+     (publish-webapp ,parameter)
+     (register-webapp ,parameter)))
 
 (defun ensure-webapp (webapp)
   (cond ((and webapp (typep webapp 'webapp))
@@ -78,6 +79,9 @@
         ((and webapp (symbolp webapp) (find-webapp webapp)))
         (t
          (error "Webapp not found"))))
+
+(defun package-webapp ()
+  (find-webapp (intern (package-name *package*))))
 
 
 
@@ -120,7 +124,7 @@
 hash table as the dispatch table of the webapp object, instead of
 the *dispatch-table* list."
   (lambda (request)
-    (let ((*package* (pack webapp)))
+    (let ((*package* (pkg webapp)))
       (iter (for (nil dispatcher) in-hashtable (dispatch-table webapp))
             (for action = (funcall dispatcher request))
             (when action
