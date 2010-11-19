@@ -313,8 +313,9 @@ object). Return the page object. "
 
 (defun publish-pages (webapp)
   (iter (for (nil page) in-hashtable (pages webapp))
-        (publish-page page webapp)
-        (collect (name page))))
+        (unless (eql (type-of page) 'static-page)
+          (funcall (publisher page))
+          (collect (name page)))))
 
 
 ;; -- Unpublish --
