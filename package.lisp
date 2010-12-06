@@ -8,7 +8,6 @@
         :cl-ppcre
         :iterate
         :alexandria
-        :metabang-bind
         :postmodern)
   (:export
    :pack
@@ -23,17 +22,24 @@
    :name
    :pkg
    :database
-   :root-path
-   :static-path
+   ;; :root-path
+   ;; :public-path
+   ;; :root-dir
+   ;; :public-dir
    :pages
    :port
-   :webroot
+   :fs-root
+   :web-root
+   :fs-paths
+   :web-paths
    :debug-p
    :acceptor-obj
    :use-ssl-p
    :dispatch-table
    :published-p
    ;; webapp functions
+   :get-fs-path
+   :get-web-path
    :define-webapp
    :find-webapp
    :register-webapp

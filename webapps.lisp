@@ -21,6 +21,7 @@
 (setf *escape-char-p*
       #'(lambda (char)
           (find char "<>&'\"")))
+(setf *attribute-quote-char* #\")
 (setf (html-mode) :xml)
 
 
@@ -33,17 +34,18 @@
   ((name           :accessor name           :initarg  :name)
    (pkg            :accessor pkg            :initarg  :pkg)
    (database       :accessor database       :initarg  :database)
-   (root-path      :accessor root-path      :initarg  :root-path)
-   (static-path    :accessor static-path    :initarg  :static-path)
    (pages          :reader   pages          :initform (make-hash-table))
    (port           :accessor port           :initarg  :port)
-   (webroot        :accessor webroot        :initarg  :webroot)
+   (web-root       :accessor web-root       :initarg  :web-root)
+   (fs-root        :accessor fs-root        :initarg  :fs-root)
+   (fs-paths       :accessor fs-paths       :initarg  :fs-paths)
+   (web-paths      :accessor web-paths      :initarg  :web-paths)
    (debug-p        :accessor debug-p        :initarg  :debug-p)
    (acceptor-obj   :accessor acceptor-obj   :initarg  :acceptor-obj)
    (use-ssl-p      :reader   use-ssl-p      :initarg  :use-ssl-p)
    (dispatch-table :reader   dispatch-table :initform (make-hash-table))
    (published-p    :accessor published-p    :initarg  :published-p))
-  (:default-initargs :use-ssl-p nil))
+  (:default-initargs :use-ssl-p nil :fs-paths '() :web-paths '()))
 
 (defmethod initialize-instance :after ((webapp webapp) &key)
   (setf (acceptor-obj webapp)
@@ -67,9 +69,9 @@
 (defun register-webapp (webapp)
   (pushnew webapp *webapps* :key #'name))
 
-(defmacro define-webapp (parameter &body body)
+(defmacro define-webapp (parameter (&optional webapp-class) &body body)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (defvar ,parameter (make-instance 'webapp ,@body))
+     (defvar ,parameter (make-instance (or ',webapp-class 'webapp) ,@body))
      (publish-webapp ,parameter)
      (register-webapp ,parameter)))
 
@@ -84,6 +86,30 @@
   (find-webapp (intern (package-name *package*))))
 
 
+;; ----------------------------------------------------------------------
+;; Paths
+;; ----------------------------------------------------------------------
+(defun get-fs-path (id)
+  "Given an identifier, which is a symbol, return the filesystem path"
+  (cdr (assoc id (slot-value (package-webapp) 'fs-paths))))
+
+(defun (setf get-fs-path) (value id)
+  (let ((alist (fs-paths (package-webapp))))
+    (if (assoc id alist)
+        (rplacd (assoc id (fs-paths (package-webapp))) value)
+        (push (cons id value) (fs-paths (package-webapp))))
+    alist))
+
+(defun get-web-path (id)
+  "Given an identifier, which is a symbol, return the web path"
+  (cdr (assoc id (slot-value (package-webapp) 'web-paths))))
+
+(defun (setf get-web-path) (value id)
+  (let ((alist (slot-value (package-webapp) 'web-paths)))
+    (if (assoc id alist)
+        (rplacd (assoc id alist) value)
+        (push (cons id value) alist))
+    alist))
 
 ;; ----------------------------------------------------------------------
 ;; Publish and Unpublish

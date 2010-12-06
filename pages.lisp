@@ -40,7 +40,7 @@ object). Return the page object. "
         (error "Page ~A not found." page-name))))
 
 (defun full-url (page)
-  (concatenate 'string (webroot (webapp page)) (base-url page)))
+  (concatenate 'string (web-root (webapp page)) (base-url page)))
 
 (defparameter *page* nil)
 
@@ -54,7 +54,7 @@ object). Return the page object. "
                                        (when val
                                          (collect (cons arg val))))))
          (concatenate 'string
-                      (webroot (webapp ,page))
+                      (web-root (webapp ,page))
                       (base-url ,page)
                       (make-query-string ,param-value-alist))))))
 
@@ -202,7 +202,7 @@ object). Return the page object. "
 ;;; ----------------------------------------------------------------------
 
 (defclass static-page (page)
-  ((path :accessor path :initarg :path)))
+  ((location :accessor location :initarg :location)))
 
 (defmethod publisher ((page static-page))
   (lambda ()
@@ -211,7 +211,7 @@ object). Return the page object. "
           (lambda (request)
             (if (string-equal (full-url page)
                               (script-name request))
-                (handle-static-file (path page) (content-type page))
+                (handle-static-file (location page) (content-type page))
                 nil)))))
 
 (defgeneric builder (page)
@@ -220,8 +220,8 @@ object). Return the page object. "
 
 (defmethod builder ((page static-page))
   (lambda ()
-    (ensure-directories-exist (path page))
-    (with-open-file (stream (path page)
+    (ensure-directories-exist (location page))
+    (with-open-file (stream (location page)
                             :element-type 'base-char
                             :direction :output
                             :if-does-not-exist :create
@@ -233,7 +233,7 @@ object). Return the page object. "
                                              (request-type :get)
                                              (content-type *default-content-type*)
                                              webapp-name
-                                             path)
+                                             location)
                               (&rest param-specs)
                               &body body)
   (with-gensyms (page parameters webapp)
@@ -243,7 +243,7 @@ object). Return the page object. "
                                     :name ',name
                                     :key (make-keyword ',name)
                                     :base-url ,base-url
-                                    :path ,path
+                                    :location ,location
                                     :request-type ,request-type
                                     :content-type ,content-type
                                     :body (lambda ()
@@ -251,37 +251,28 @@ object). Return the page object. "
               (,parameters (list ,@(build-parameter-list page param-specs))))
          (setf (parameters ,page) ,parameters)
          (register-page ,page (or ,webapp (package-webapp)))
-         (unless (path ,page)
-           (setf (path ,page) (static-page-pathname ,page)))
+         (unless (location ,page)
+           (setf (location ,page) (static-page-pathname ,page)))
          (define-page-fn ,name (or ,webapp (package-webapp)) ,parameter-names)
          (publish-page ',name (or ,webapp (package-webapp)))))))
 
 (defun static-page-pathname (page)
-  (let* ((split-base-url (split "/" (base-url page)))
-         (static-directory (or (butlast split-base-url) (list "")))
-         (static-filename (lastcar split-base-url))
-         (webapp (webapp page)))
-    (make-pathname* :file static-filename
-                    :dir (cons (root-path webapp)
-                               (cons (static-path webapp)
-                                     static-directory)))))
+  (let ((relative-path
+         (if (ends-with #\/ (base-url page))
+             (make-pathname :directory (if (emptyp (base-url page))
+                                           `(:relative ,@(split "/" (base-url page)))
+                                           nil)
+                            :name "index"
+                            :type "html")
+             (cl-fad:pathname-as-file
+              (make-pathname :directory `(:relative ,@(split "/" (base-url page))))))))
+    (merge-pathnames relative-path (fs-root (package-webapp)))))
 
 ;; ----------------------------------------------------------------------
 ;; Build, Publish and Unpublish
 ;; ----------------------------------------------------------------------
 
 ;; -- Build --
-
-;; (defgeneric %build-page (page))
-
-;; (defmethod %build-page ((page static-page))
-;;   (funcall (builder page) (static-page-pathname page)))
-
-;; (defmethod %build-page ((page dynamic-page))
-;;   (values))
-
-;; (defmethod %build-page ((page external-page))
-;;   (values))
 
 (defun build-page (page)
   (funcall (builder page))
@@ -295,18 +286,8 @@ object). Return the page object. "
             (collect (name page))))))
 
 
+
 ;; -- Publish --
-
-;; (defgeneric %publish-page (page))
-
-;; (defmethod %publish-page ((page static-page))
-;;   (funcall (publisher page) (static-page-pathname page)))
-
-;; (defmethod %publish-page ((page dynamic-page))
-;;   (funcall (publisher page)))
-
-;; (defmethod %publish-page ((page external-page))
-;;   (values))
 
 (defun publish-page (page-name webapp)
   (funcall (publisher (find-page page-name webapp))))

@@ -10,7 +10,7 @@
                :cl-ppcre
                :iterate
                :alexandria
-               :metabang-bind
+               :cl-fad
                :postmodern)
   :components ((:file "package")
                (:file "utils")
