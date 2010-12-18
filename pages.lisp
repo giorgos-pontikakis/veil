@@ -80,7 +80,7 @@ object). Return the page object. "
                               :key (make-keyword ',name)
                               :lisp-type ',lisp-type
                               :vfn ,(cond ((consp vspec) `(symbol-function ',(first vspec)))
-                                          ((null vspec) '(constantly t))
+                                          ((null vspec) '(constantly nil))
                                           (t `(symbol-function ',vspec)))
                               :vargs ',(cond ((consp vspec) (rest vspec))
                                              ((null vspec) nil)

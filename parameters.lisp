@@ -119,7 +119,7 @@
 
 (defun find-params (page names)
   ;; We iterate instead of using remove-if-not or something similar so
-  ;; that wekeep the order of the parameters unchanged
+  ;; that we keep the order of the parameters unchanged
   (let ((parameters (parameters page)))
     (iter (for n in names)
           (collect (find n parameters :key #'name)))))
