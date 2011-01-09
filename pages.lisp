@@ -1,6 +1,6 @@
 (in-package :veil)
 
-(declaim (optimize (speed 0) (debug 3)))
+
 
 ;;; ----------------------------------------------------------------------
 ;;; Web pages

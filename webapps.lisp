@@ -1,10 +1,11 @@
 (in-package :veil)
 
-(declaim (optimize (speed 0) (debug 3)))
+
 
 ;;; ----------------------------------------------------------------------
 ;;; Default Hunchentoot configuration
 ;;; ----------------------------------------------------------------------
+
 (setf *hunchentoot-default-external-format* (flexi-streams:make-external-format :utf-8))
 (setf *default-content-type* "text/html; charset=UTF-8")
 (setf *use-user-agent-for-sessions* t)
@@ -18,6 +19,7 @@
 ;;; ----------------------------------------------------------------------
 ;;; Default CL-WHO configuration
 ;;; ----------------------------------------------------------------------
+
 (setf *escape-char-p*
       #'(lambda (char)
           (find char "<>&'\"")))
