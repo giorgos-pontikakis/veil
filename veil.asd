@@ -11,7 +11,8 @@
                :iterate
                :alexandria
                :cl-fad
-               :postmodern)
+               :postmodern
+               :simple-date)
   :components ((:file "package")
                (:file "utils")
                (:file "webapps")

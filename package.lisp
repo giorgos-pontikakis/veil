@@ -8,7 +8,8 @@
         :cl-ppcre
         :iterate
         :alexandria
-        :postmodern)
+        :postmodern
+        :simple-date)
   (:export
    :pack
    ;; db

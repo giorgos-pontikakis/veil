@@ -51,6 +51,10 @@
 (defmethod lisp->html ((value symbol))
   (format nil "~A" (string-downcase value)))
 
+(defmethod lisp->html ((value date))
+  (multiple-value-bind (year month day) (decode-date value)
+    (format nil "~A-~A-~A" day month year)))
+
 
 ;; html to lisp
 
@@ -90,6 +94,14 @@
 
 (defmethod html->lisp (value (type (eql 'symbol)))
   (intern (string-upcase value)))
+
+(defmethod html->lisp (value (type (eql 'date)))
+  (handler-case (apply #'encode-date
+                       (mapcar #'parse-integer (nreverse (split "-|/|\\." value))))
+    (parse-error ()
+      (error 'http-parse-error
+             :http-type type
+             :raw-value value))))
 
 
 
