@@ -60,6 +60,8 @@
    :path
    :builder
    :publisher
+   :url-fn
+   :registers
    ;; page functions
    :*page*
    :dynamic-page

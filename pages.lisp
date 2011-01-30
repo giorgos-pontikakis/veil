@@ -1,6 +1,13 @@
 (in-package :veil)
 
-
+;; (defmacro make-template-url-fn (&rest args)
+;;   (let ((syms (mapcan (lambda (item)
+;;                         (if (symbolp item)
+;;                             (list item)
+;;                             nil))
+;;                       args)))
+;;     `(lambda ,syms
+;;        (concatenate 'string ,@args))))
 
 ;;; ----------------------------------------------------------------------
 ;;; Web pages
@@ -39,9 +46,6 @@ object). Return the page object. "
         (remhash (name page) (pages (webapp page)))
         (error "Page ~A not found." page-name))))
 
-(defun full-url (page)
-  (concatenate 'string (web-root (webapp page)) (base-url page)))
-
 (defparameter *page* nil)
 
 (defmacro define-page-fn (page-name webapp &optional arguments)
@@ -58,15 +62,26 @@ object). Return the page object. "
                       (base-url ,page)
                       (make-query-string ,param-value-alist))))))
 
+(defmacro define-regex-page-fn (page-name webapp registers &optional arguments)
+  (with-gensyms (page param-value-alist)
+    `(defun ,page-name ,(append registers
+                                (cons '&key (append arguments (list 'fragment))))
+       (declare (ignorable fragment))
+       (let ((,page (find-page ',page-name ,webapp))
+             (,param-value-alist (iter (for arg in ',arguments)
+                                       (for val in (list ,@arguments))
+                                       (when val
+                                         (collect (cons arg val))))))
+         (concatenate 'string
+                      (web-root (webapp ,page))
+                      (funcall (url-fn ,page) ,@registers)
+                      (make-query-string ,param-value-alist))))))
+
 
 
 ;;; ----------------------------------------------------------------------
-;;; Dynamic and regex pages
+;;; Local utilities
 ;;; ----------------------------------------------------------------------
-
-(defgeneric handler (page &key)
-  (:documentation "Return a function which, when called, returns the
-  handler for a page of class dynamic-page or its subclasses"))
 
 (defun build-parameter-list (page specs)
   (mapcar (lambda (spec)
@@ -92,6 +107,18 @@ object). Return the page object. "
 (defun build-parameter-names (spec)
   (mapcar #'first (mapcar #'ensure-list spec)))
 
+(defun full-base-url (page)
+  (concatenate 'string (web-root (webapp page)) (base-url page)))
+
+
+
+;;; ----------------------------------------------------------------------
+;;; Dynamic and regex pages
+;;; ----------------------------------------------------------------------
+
+(defgeneric handler (page &key)
+  (:documentation "Return a function which, when called, returns the
+  handler for a page of class dynamic-page or its subclasses"))
 
 
 ;;; --- Dynamic pages ---
@@ -104,8 +131,8 @@ object). Return the page object. "
       (setf (gethash (name page)
                      (dispatch-table (webapp page)))
             (lambda (request)
-              (if (string-equal (full-url page)
-                                (script-name request))
+              (if (string= (full-base-url page)
+                           (script-name request))
                   (progn
                     (set-parameters page)
                     (handler page))
@@ -145,7 +172,9 @@ object). Return the page object. "
 ;;; --- Regex pages ---
 
 (defclass regex-page (dynamic-page)
-  ((scanner :accessor scanner :initarg :scanner)))
+  ((scanner   :accessor scanner   :initarg :scanner)
+   (registers :accessor registers :initarg :registers)
+   (url-fn    :accessor url-fn    :initarg :url-fn)))
 
 (defmethod publisher ((page regex-page))
   (lambda ()
@@ -161,12 +190,12 @@ object). Return the page object. "
                   nil))))))
 
 (defmethod handler ((page regex-page) &key register-values)
-  #'(lambda ()
-      (let ((*page* page))
-        (declare (special *page*))
-        (with-output-to-string (*standard-output*)
-          (apply (body page)
-                 (append (parameters page) register-values))))))
+  (lambda ()
+    (let ((*page* page))
+      (declare (special *page*))
+      (with-output-to-string (*standard-output*)
+        (apply (body page)
+               (append (parameters page) register-values))))))
 
 (defmacro define-regex-page (name (base-url &key
                                             (request-type :get)
@@ -175,24 +204,37 @@ object). Return the page object. "
                                             webapp-name)
                              (&rest param-specs) &body body)
   (with-gensyms (page parameters webapp)
-    (let ((parameter-names (build-parameter-names param-specs)))
+    (let ((param-names (build-parameter-names param-specs))
+          (reg-param-names (mapcan (lambda (item)
+                                         (if (symbolp item)
+                                             (list item)
+                                             nil))
+                                       base-url)))
       `(let* ((,webapp (find-webapp ',webapp-name))
               (,page (make-instance 'regex-page
                                     :name ',name
                                     :key (make-keyword ',name)
-                                    :base-url ,base-url
+                                    :base-url ',base-url
+                                    :registers ',registers
+                                    :url-fn (lambda ,reg-param-names
+                                              (concatenate 'string ,@base-url))
                                     :request-type ,request-type
                                     :content-type ,content-type
-                                    :body (lambda (,@parameter-names ,@registers)
+                                    :body (lambda (,@param-names ,@reg-param-names)
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
          (register-page ,page (or ,webapp (package-webapp)))
          (setf (parameters ,page) ,parameters)
          (setf (scanner ,page)
-               (create-scanner (concatenate 'string
-                                            "^"
-                                            (full-url ,page))))
-         (define-page-fn ,name (or ,webapp (package-webapp)) ,parameter-names)
+               (create-scanner (apply #'concatenate 'string
+                                      "^"
+                                      (web-root (webapp ,page))
+                                      (mapcar (lambda (item)
+                                                (if (symbolp item)
+                                                    (or (getf ',registers item) "(.*)")
+                                                    item))
+                                              (append ',base-url (list "$"))))))
+         (define-regex-page-fn ,name (or ,webapp (package-webapp)) ,reg-param-names ,param-names)
          (publish-page ',name (or ,webapp (package-webapp)))))))
 
 
@@ -209,8 +251,8 @@ object). Return the page object. "
     (setf (gethash (name page)
                    (dispatch-table (webapp page)))
           (lambda (request)
-            (if (string-equal (full-url page)
-                              (script-name request))
+            (if (string= (full-base-url page)
+                         (script-name request))
                 (handle-static-file (location page) (content-type page))
                 nil)))))
 
@@ -267,6 +309,8 @@ object). Return the page object. "
              (cl-fad:pathname-as-file
               (make-pathname :directory `(:relative ,@(split "/" (base-url page))))))))
     (merge-pathnames relative-path (fs-root (package-webapp)))))
+
+
 
 ;; ----------------------------------------------------------------------
 ;; Build, Publish and Unpublish

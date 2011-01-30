@@ -53,7 +53,7 @@
 
 (defmethod lisp->html ((value date))
   (multiple-value-bind (year month day) (decode-date value)
-    (format nil "~A-~A-~A" day month year)))
+    (format nil "~A/~A/~A" day month year)))
 
 
 ;; html to lisp
