@@ -20,9 +20,6 @@
 ;;; Default CL-WHO configuration
 ;;; ----------------------------------------------------------------------
 
-(setf *escape-char-p*
-      #'(lambda (char)
-          (find char "<>&'\"")))
 (setf *attribute-quote-char* #\")
 (setf (html-mode) :xml)
 

@@ -22,7 +22,7 @@
   (with-output-to-string (*standard-output*)
     (iter (for (sym . val) in param-value-alist)
           (princ (if (first-time-p) #\? #\&))
-          (when-let ((encoded-value (url-encode (lisp->html val))))
+          (when val
             (princ (string-downcase sym))
             (princ #\=)
-            (princ encoded-value)))))
+            (princ (url-encode (format nil "~A" val)))))))

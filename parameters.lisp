@@ -46,10 +46,10 @@
   (format nil "~A" value))
 
 (defmethod lisp->html ((value string))
-  (format nil "~A" (escape-string value)))
+  (escape-for-html (format nil "~A" value)))
 
 (defmethod lisp->html ((value symbol))
-  (format nil "~A" (string-downcase value)))
+  (escape-for-html (format nil "~A" (string-downcase value))))
 
 (defmethod lisp->html ((value date))
   (multiple-value-bind (year month day) (decode-date value)
