@@ -16,7 +16,7 @@
 
 
 ;;; ----------------------------------------------------------------------
-;;; Lisp - HTML conversions
+;;; Lisp - HTML and Lisp - URL encoding conversions
 ;;; ----------------------------------------------------------------------
 
 (defparameter +html-true+ "true")
@@ -25,7 +25,7 @@
 
 (defgeneric lisp->html (value))
 
-(defgeneric html->lisp (string type))
+(defgeneric urlenc->lisp (string type))
 
 
 ;; lisp to html
@@ -56,9 +56,15 @@
     (format nil "~A/~A/~A" day month year)))
 
 
-;; html to lisp
+;; urlenc to lisp and vice versa
 
-(defmethod html->lisp :around (value type)
+(defun lisp->urlenc (value)
+  (url-encode (cond ((null value) +html-false+)
+                    ((eql value t) +html-true+)
+                    ((eql value :null) +html-null+)
+                    (t (format nil "~A" value)))))
+
+(defmethod urlenc->lisp :around (value type)
   (cond ((null value)
          nil)
         ((string-equal value +html-null+)
@@ -66,10 +72,10 @@
         (t
          (call-next-method (string-trim " " value) type))))
 
-(defmethod html->lisp (value (type (eql 'string)))
+(defmethod urlenc->lisp (value (type (eql 'string)))
   value)
 
-(defmethod html->lisp (value (type (eql 'integer)))
+(defmethod urlenc->lisp (value (type (eql 'integer)))
   (handler-case (if (string-equal value +html-false+)
                     nil
                     (parse-integer value))
@@ -77,7 +83,7 @@
                            :http-type type
                            :raw-value value))))
 
-(defmethod html->lisp (value (type (eql 'float)))
+(defmethod urlenc->lisp (value (type (eql 'float)))
   (handler-case (if (string-equal value +html-false+)
                     nil
                     (parse-float value))
@@ -85,17 +91,17 @@
                            :http-type type
                            :raw-value value))))
 
-(defmethod html->lisp (value (type (eql 'boolean)))
+(defmethod urlenc->lisp (value (type (eql 'boolean)))
   (cond ((string-equal value +html-true+)  t)
         ((string-equal value +html-false+) nil)
         (t (error 'http-parse-error
                   :http-type type
                   :raw-value value))))
 
-(defmethod html->lisp (value (type (eql 'symbol)))
+(defmethod urlenc->lisp (value (type (eql 'symbol)))
   (intern (string-upcase value)))
 
-(defmethod html->lisp (value (type (eql 'date)))
+(defmethod urlenc->lisp (value (type (eql 'date)))
   (handler-case (apply #'encode-date
                        (mapcar #'parse-integer (nreverse (split "-|/|\\." value))))
     (parse-error ()
@@ -137,7 +143,7 @@
           (collect (find n parameters :key #'name)))))
 
 (defun parse-parameter (p raw)
-  (handler-case (let ((parsed (html->lisp raw (lisp-type p))))
+  (handler-case (let ((parsed (urlenc->lisp raw (lisp-type p))))
                   (if (and (null parsed)
                            (not (eql 'boolean (lisp-type p))))
                       (setf (raw p) raw

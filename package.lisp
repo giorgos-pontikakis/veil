@@ -83,7 +83,8 @@
    :+html-false+
    :+html-null+
    :lisp->html
-   :html->lisp
+   :urlenc->lisp
+   :lisp->urlenc
    :lisp-type
    :val
    :raw

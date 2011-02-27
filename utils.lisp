@@ -25,4 +25,4 @@
           (when val
             (princ (string-downcase sym))
             (princ #\=)
-            (princ (url-encode (format nil "~A" val)))))))
+            (princ (lisp->urlenc val))))))
