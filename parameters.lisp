@@ -104,7 +104,7 @@
 (defmethod urlenc->lisp (value (type (eql 'date)))
   (handler-case (apply #'encode-date
                        (mapcar #'parse-integer (nreverse (split "-|/|\\." value))))
-    (parse-error ()
+    (error () ;; match all errors
       (error 'http-parse-error
              :http-type type
              :raw-value value))))
