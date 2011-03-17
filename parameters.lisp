@@ -40,10 +40,13 @@
   +html-false+)
 
 (defmethod lisp->html ((value integer))
-  (format nil "~A" value))
+  (format nil "~D" value))
+
+(defmethod lisp->html ((value rational))
+  (format nil "~,2F" value))
 
 (defmethod lisp->html ((value float))
-  (format nil "~A" value))
+  (format nil "~,4F" value))
 
 (defmethod lisp->html ((value string))
   (escape-for-html (format nil "~A" value)))
