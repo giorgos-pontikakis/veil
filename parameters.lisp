@@ -105,8 +105,10 @@
   (intern (string-upcase value)))
 
 (defmethod urlenc->lisp (value (type (eql 'date)))
-  (handler-case (apply #'encode-date
-                       (mapcar #'parse-integer (nreverse (split "-|/|\\." value))))
+  (handler-case (destructuring-bind (day month year) (mapcar #'parse-integer (split "-|/|\\." value))
+                  (encode-date (if (< year 1000) (+ year 2000) year)
+                               month
+                               day))
     (error () ;; match all errors
       (error 'http-parse-error
              :http-type type
