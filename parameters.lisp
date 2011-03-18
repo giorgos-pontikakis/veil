@@ -209,3 +209,13 @@
      (raw param))
     ;; parameter supplied and ok: return val
     (t (val param))))
+
+(defun validate-parameters (chk-fn &rest parameters)
+  (when (and (some #'suppliedp parameters)
+             (every #'validp parameters))
+    (when-let (error-type (apply chk-fn (mapcar #'val parameters)))
+      (mapc (lambda (p)
+              (slot-makunbound p 'val)
+              (setf (validp p) nil)
+              (setf (error-type p) error-type))
+            parameters))))

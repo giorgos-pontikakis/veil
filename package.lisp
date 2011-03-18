@@ -93,4 +93,5 @@
    :requiredp
    :error-type
    :find-parameter
+   :validate-parameters
    :val*))
