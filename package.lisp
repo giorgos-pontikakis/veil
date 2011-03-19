@@ -94,4 +94,5 @@
    :error-type
    :find-parameter
    :validate-parameters
-   :val*))
+   :val*
+   :parse-date))

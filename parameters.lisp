@@ -105,15 +105,13 @@
   (intern (string-upcase value)))
 
 (defmethod urlenc->lisp (value (type (eql 'date)))
-  (handler-case (destructuring-bind (day month year) (mapcar #'parse-integer (split "-|/|\\." value))
-                  (encode-date (if (< year 1000) (+ year 2000) year)
-                               month
-                               day))
+  (handler-case (if (string-equal value +html-false+)
+                    nil
+                    (parse-date value))
     (error () ;; match all errors
       (error 'http-parse-error
              :http-type type
              :raw-value value))))
-
 
 
 ;;; ----------------------------------------------------------------------
@@ -195,7 +193,7 @@
 
 
 ;;; ------------------------------------------------------------
-;;; Utilities
+;;; Exported utilities
 ;;; ------------------------------------------------------------
 
 (defun find-parameter (name &optional (page *page*))
@@ -221,3 +219,9 @@
               (setf (validp p) nil)
               (setf (error-type p) error-type))
             parameters))))
+
+(defun parse-date (value)
+  (destructuring-bind (day month year) (mapcar #'parse-integer (split "-|/|\\." value))
+    (encode-date (if (< year 1000) (+ year 2000) year)
+                 month
+                 day)))
