@@ -308,7 +308,7 @@ object). Return the page object. "
                             :type "html")
              (cl-fad:pathname-as-file
               (make-pathname :directory `(:relative ,@(split "/" (base-url page))))))))
-    (merge-pathnames relative-path (fs-root (package-webapp)))))
+    (merge-pathnames relative-path (doc-root (package-webapp)))))
 
 
 

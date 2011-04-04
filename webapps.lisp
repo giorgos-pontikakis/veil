@@ -35,9 +35,10 @@
    (database       :accessor database       :initarg  :database)
    (pages          :reader   pages          :initform (make-hash-table))
    (port           :accessor port           :initarg  :port)
-   (web-root       :accessor web-root       :initarg  :web-root)
    (fs-root        :accessor fs-root        :initarg  :fs-root)
+   (doc-root       :accessor doc-root       :initarg  :doc-root)
    (fs-paths       :accessor fs-paths       :initarg  :fs-paths)
+   (web-root       :accessor web-root       :initarg  :web-root)
    (web-paths      :accessor web-paths      :initarg  :web-paths)
    (debug-p        :accessor debug-p        :initarg  :debug-p)
    (acceptor-obj   :accessor acceptor-obj   :initarg  :acceptor-obj)
@@ -109,6 +110,8 @@
         (rplacd (assoc id alist) value)
         (push (cons id value) alist))
     alist))
+
+
 
 ;; ----------------------------------------------------------------------
 ;; Publish and Unpublish
