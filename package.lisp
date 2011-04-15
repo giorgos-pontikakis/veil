@@ -61,7 +61,8 @@
    :builder
    :publisher
    :url-fn
-   :registers
+   :register-names
+   :register-groups
    ;; page functions
    :*page*
    :dynamic-page

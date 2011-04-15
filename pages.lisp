@@ -1,13 +1,6 @@
 (in-package :veil)
 
-;; (defmacro make-template-url-fn (&rest args)
-;;   (let ((syms (mapcan (lambda (item)
-;;                         (if (symbolp item)
-;;                             (list item)
-;;                             nil))
-;;                       args)))
-;;     `(lambda ,syms
-;;        (concatenate 'string ,@args))))
+
 
 ;;; ----------------------------------------------------------------------
 ;;; Web pages
@@ -172,9 +165,10 @@ object). Return the page object. "
 ;;; --- Regex pages ---
 
 (defclass regex-page (dynamic-page)
-  ((scanner   :accessor scanner   :initarg :scanner)
-   (registers :accessor registers :initarg :registers)
-   (url-fn    :accessor url-fn    :initarg :url-fn)))
+  ((scanner         :accessor scanner         :initarg :scanner)
+   (register-names  :accessor register-names  :initarg :register-names)
+   (register-groups :accessor register-groups :initarg :register-groups)
+   (url-fn          :accessor url-fn          :initarg :url-fn)))
 
 (defmethod publisher ((page regex-page))
   (lambda ()
@@ -200,41 +194,47 @@ object). Return the page object. "
 (defmacro define-regex-page (name (base-url &key
                                             (request-type :get)
                                             (content-type *default-content-type*)
-                                            registers
                                             webapp-name)
                              (&rest param-specs) &body body)
   (with-gensyms (page parameters webapp)
     (let ((param-names (build-parameter-names param-specs))
-          (reg-param-names (mapcan (lambda (item)
-                                         (if (symbolp item)
-                                             (list item)
-                                             nil))
-                                       base-url)))
+          (register-names (mapcan (lambda (item)
+                                    (if (listp item)
+                                        (list (first item))
+                                        nil))
+                                  base-url))
+          (register-groups (mapcan (lambda (item)
+                                     (if (listp item)
+                                         (list (concatenate  'string "(" (second item) ")"))
+                                         nil))
+                                   base-url)))
       `(let* ((,webapp (find-webapp ',webapp-name))
               (,page (make-instance 'regex-page
                                     :name ',name
                                     :key (make-keyword ',name)
                                     :base-url ',base-url
-                                    :registers ',registers
-                                    :url-fn (lambda ,reg-param-names
-                                              (concatenate 'string ,@base-url))
+                                    :register-names ',register-names
+                                    :register-groups ',register-groups
+                                    :url-fn (lambda ,register-names
+                                              (concatenate 'string ,@(mapcar (lambda (item)
+                                                                               (if (listp item)
+                                                                                   (first item)
+                                                                                   item))
+                                                                             base-url)))
                                     :request-type ,request-type
                                     :content-type ,content-type
-                                    :body (lambda (,@param-names ,@reg-param-names)
+                                    :body (lambda (,@param-names ,@register-names)
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
          (register-page ,page (or ,webapp (package-webapp)))
          (setf (parameters ,page) ,parameters)
          (setf (scanner ,page)
-               (create-scanner (apply #'concatenate 'string
-                                      "^"
-                                      (web-root (webapp ,page))
-                                      (mapcar (lambda (item)
-                                                (if (symbolp item)
-                                                    (or (getf ',registers item) "(.*)")
-                                                    item))
-                                              (append ',base-url (list "$"))))))
-         (define-regex-page-fn ,name (or ,webapp (package-webapp)) ,reg-param-names ,param-names)
+               (create-scanner (concatenate 'string
+                                            "^"
+                                            (web-root (webapp ,page))
+                                            ,@register-groups
+                                            "$")))
+         (define-regex-page-fn ,name (or ,webapp (package-webapp)) ,register-names ,param-names)
          (publish-page ',name (or ,webapp (package-webapp)))))))
 
 
