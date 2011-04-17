@@ -167,7 +167,6 @@ object). Return the page object. "
 (defclass regex-page (dynamic-page)
   ((scanner         :accessor scanner         :initarg :scanner)
    (register-names  :accessor register-names  :initarg :register-names)
-   (register-groups :accessor register-groups :initarg :register-groups)
    (url-fn          :accessor url-fn          :initarg :url-fn)))
 
 (defmethod publisher ((page regex-page))
@@ -202,19 +201,13 @@ object). Return the page object. "
                                     (if (listp item)
                                         (list (first item))
                                         nil))
-                                  base-url))
-          (register-groups (mapcan (lambda (item)
-                                     (if (listp item)
-                                         (list (concatenate  'string "(" (second item) ")"))
-                                         nil))
-                                   base-url)))
+                                  base-url)))
       `(let* ((,webapp (find-webapp ',webapp-name))
               (,page (make-instance 'regex-page
                                     :name ',name
                                     :key (make-keyword ',name)
                                     :base-url ',base-url
                                     :register-names ',register-names
-                                    :register-groups ',register-groups
                                     :url-fn (lambda ,register-names
                                               (concatenate 'string ,@(mapcar (lambda (item)
                                                                                (if (listp item)
@@ -232,7 +225,12 @@ object). Return the page object. "
                (create-scanner (concatenate 'string
                                             "^"
                                             (web-root (webapp ,page))
-                                            ,@register-groups
+                                            ,@(mapcar (lambda (item)
+                                                        (if (listp item)
+                                                            (concatenate 'string
+                                                                         "(" (second item) ")")
+                                                            item))
+                                                      base-url)
                                             "$")))
          (define-regex-page-fn ,name (or ,webapp (package-webapp)) ,register-names ,param-names)
          (publish-page ',name (or ,webapp (package-webapp)))))))
