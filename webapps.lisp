@@ -70,7 +70,7 @@
   (pushnew webapp *webapps* :key #'name))
 
 (defmacro define-webapp (parameter (&optional webapp-class) &body body)
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
+  `(progn
      (defvar ,parameter (make-instance (or ',webapp-class 'webapp) ,@body))
      (publish-webapp ,parameter)
      (register-webapp ,parameter)))
@@ -86,9 +86,11 @@
   (find-webapp (intern (package-name *package*))))
 
 
+
 ;; ----------------------------------------------------------------------
 ;; Paths
 ;; ----------------------------------------------------------------------
+
 (defun get-fs-path (id)
   "Given an identifier, which is a symbol, return the filesystem path"
   (cdr (assoc id (slot-value (package-webapp) 'fs-paths))))
