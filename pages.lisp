@@ -227,8 +227,7 @@ object). Return the page object. "
                                             (web-root (webapp ,page))
                                             ,@(mapcar (lambda (item)
                                                         (if (listp item)
-                                                            (concatenate 'string
-                                                                         "(" (second item) ")")
+                                                            (second item)
                                                             item))
                                                       base-url)
                                             "$")))
