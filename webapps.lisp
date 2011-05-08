@@ -83,7 +83,11 @@
          (error "Webapp not found"))))
 
 (defun package-webapp ()
-  (find-webapp (intern (package-name *package*))))
+  (if-let (app (find-symbol "*WEBAPP*" (package-name *package*)))
+    (if (boundp app)
+        (find-webapp (name (symbol-value app)))
+        (error "Symbol *WEBAPP* is present in package but it is unbound."))
+    (find-webapp (package-name *package*))))
 
 
 
