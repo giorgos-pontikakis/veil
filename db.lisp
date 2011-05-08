@@ -18,7 +18,7 @@
 
 ;;; Utilities
 
-(defmacro with-db ((&optional database) &body body)
+(defmacro with-db (&optional database &body body)
   (with-gensyms (db)
     `(let ((,db (or ,database (database (package-webapp)))))
        (with-connection (list (dbname ,db)
