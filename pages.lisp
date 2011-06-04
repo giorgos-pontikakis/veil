@@ -67,7 +67,7 @@ object). Return the page object. "
                                          (collect (cons arg val))))))
          (concatenate 'string
                       (web-root (webapp ,page))
-                      (funcall (url-fn ,page) ,@registers)
+                      (apply (url-fn ,page) (mapcar #'lisp->urlenc (list ,@registers)))
                       (make-query-string ,param-value-alist))))))
 
 
