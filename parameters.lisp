@@ -72,6 +72,8 @@
          nil)
         ((string-equal value +html-null+)
          :null)
+        ((string-equal value +html-false+)
+         nil)
         (t
          (call-next-method (string-trim " " value) type))))
 
