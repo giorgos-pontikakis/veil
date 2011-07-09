@@ -44,7 +44,7 @@ object). Return the page object. "
 (defmacro define-page-fn (page-name webapp &optional arguments)
   (with-gensyms (page param-value-alist)
     `(defun ,page-name ,(cons '&key (append arguments (list 'fragment)))
-       (declare (ignorable fragment))
+       (declare (ignorable ,@arguments fragment))
        (let ((,page (find-page ',page-name ,webapp))
              (,param-value-alist (iter (for arg in ',arguments)
                                        (for val in (list ,@arguments))
@@ -59,7 +59,7 @@ object). Return the page object. "
   (with-gensyms (page param-value-alist)
     `(defun ,page-name ,(append registers
                                 (cons '&key (append arguments (list 'fragment))))
-       (declare (ignorable fragment))
+       (declare (ignorable ,@arguments fragment))
        (let ((,page (find-page ',page-name ,webapp))
              (,param-value-alist (iter (for arg in ',arguments)
                                        (for val in (list ,@arguments))
@@ -153,6 +153,7 @@ object). Return the page object. "
                                     :request-type ,request-type
                                     :content-type ,content-type
                                     :body (lambda (,@parameter-names)
+                                            (declare (ignorable ,@parameter-names))
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
          (register-page ,page (or ,webapp (package-webapp)))
@@ -217,6 +218,7 @@ object). Return the page object. "
                                     :request-type ,request-type
                                     :content-type ,content-type
                                     :body (lambda (,@param-names ,@register-names)
+                                            (declare (ignorable ,@param-names ,@register-names))
                                             ,@body)))
               (,parameters (list ,@(build-parameter-list page param-specs))))
          (register-page ,page (or ,webapp (package-webapp)))
