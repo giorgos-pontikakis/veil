@@ -7,14 +7,15 @@
 ;;; ----------------------------------------------------------------------
 
 (defclass page ()
-  ((name         :accessor name         :initarg :name)
-   (key          :accessor key          :initarg :key)
-   (webapp       :reader   webapp)
-   (base-url     :accessor base-url     :initarg :base-url)
-   (content-type :accessor content-type :initarg :content-type)
-   (body         :accessor body         :initarg :body)
-   (request-type :accessor request-type :initarg :request-type)
-   (parameters   :accessor parameters   :initarg :parameters)))
+  ((name                 :accessor name                 :initarg :name)
+   (key                  :accessor key                  :initarg :key)
+   (webapp               :reader   webapp)
+   (base-url             :accessor base-url             :initarg :base-url)
+   (content-type         :accessor content-type         :initarg :content-type)
+   (body                 :accessor body                 :initarg :body)
+   (request-type         :accessor request-type         :initarg :request-type)
+   (parameter-attributes :accessor parameter-attributes :initarg :parameter-attributes)
+   (parameters           :accessor parameters           :initarg :parameters)))
 
 (defgeneric publisher (page)
   (:documentation "Return a function which, when called, returns the
@@ -40,6 +41,7 @@ object). Return the page object. "
         (error "Page ~A not found." page-name))))
 
 (defparameter *page* nil)
+(defparameter *parameters* nil)
 
 (defmacro define-page-fn (page-name webapp &optional arguments)
   (with-gensyms (page param-value-alist)
@@ -73,16 +75,26 @@ object). Return the page object. "
 
 
 ;;; ----------------------------------------------------------------------
-;;; Local utilities
+;;; Parameter attributes
 ;;; ----------------------------------------------------------------------
 
-(defun build-parameter-list (page specs)
+(defclass http-parameter-attributes ()
+  ((template  :accessor template  :initarg :template)
+   (name      :accessor name      :initarg :name)
+   (key       :accessor key       :initarg :key)
+   (page      :accessor page      :initarg :page)
+   (lisp-type :accessor lisp-type :initarg :lisp-type)
+   (vfn       :accessor vfn       :initarg :vfn)
+   (vargs     :accessor vargs     :initarg :vargs)
+   (requiredp :accessor requiredp :initarg :requiredp)))
+
+(defun build-parameter-attributes (page specs)
   (mapcar (lambda (spec)
             (destructuring-bind (name &optional
                                       (lisp-type 'string)
                                       vspec
                                       requiredp) (ensure-list spec)
-              `(make-instance 'http-parameter
+              `(make-instance 'http-parameter-attributes
                               :name ',name
                               :page ,page
                               :key (make-keyword ',name)
@@ -126,24 +138,22 @@ object). Return the page object. "
             (lambda (request)
               (if (string= (full-base-url page)
                            (script-name request))
-                  (progn
-                    (set-parameters page)
-                    (handler page))
+                  (handler page)
                   nil)))))
 
 (defmethod handler ((page dynamic-page) &key)
   #'(lambda ()
-      (let ((*page* page))
-        (declare (special *page*))
+      (let ((*page* page)
+            (*parameters* (parse-parameters page)))
         (with-output-to-string (*standard-output*)
-          (apply (body page) (parameters page))))))
+          (apply (body page) *parameters*)))))
 
 (defmacro define-dynamic-page (name (base-url &key
                                               (request-type :get)
                                               (content-type *default-content-type*)
                                               webapp-name)
                                (&rest param-specs) &body body)
-  (with-gensyms (page parameters webapp)
+  (with-gensyms (page parameter-attributes webapp)
     (let ((parameter-names (build-parameter-names param-specs)))
       `(let* ((,webapp (find-webapp ',webapp-name))
               (,page (make-instance 'dynamic-page
@@ -155,9 +165,9 @@ object). Return the page object. "
                                     :body (lambda (,@parameter-names)
                                             (declare (ignorable ,@parameter-names))
                                             ,@body)))
-              (,parameters (list ,@(build-parameter-list page param-specs))))
+              (,parameter-attributes (list ,@(build-parameter-attributes page param-specs))))
          (register-page ,page (or ,webapp (package-webapp)))
-         (setf (parameters ,page) ,parameters)
+         (setf (parameter-attributes ,page) ,parameter-attributes)
          (define-page-fn ,name (or ,webapp (package-webapp)) ,parameter-names)
          (publish-page ',name (or ,webapp (package-webapp)))))))
 
@@ -178,25 +188,23 @@ object). Return the page object. "
             (multiple-value-bind (match regs) (scan-to-strings (scanner page)
                                                                (script-name request))
               (if match
-                  (progn
-                    (set-parameters page)
-                    (handler page :register-values (coerce regs 'list)))
+                  (handler page :register-values (coerce regs 'list))
                   nil))))))
 
 (defmethod handler ((page regex-page) &key register-values)
   (lambda ()
-    (let ((*page* page))
-      (declare (special *page*))
+    (let ((*page* page)
+          (*parameters* (parse-parameters page)))
       (with-output-to-string (*standard-output*)
         (apply (body page)
-               (append (parameters page) register-values))))))
+               (append *parameters* register-values))))))
 
 (defmacro define-regex-page (name (base-url &key
                                             (request-type :get)
                                             (content-type *default-content-type*)
                                             webapp-name)
                              (&rest param-specs) &body body)
-  (with-gensyms (page parameters webapp)
+  (with-gensyms (page parameter-attributes webapp)
     (let ((param-names (build-parameter-names param-specs))
           (register-names (mapcan (lambda (item)
                                     (if (listp item)
@@ -220,9 +228,9 @@ object). Return the page object. "
                                     :body (lambda (,@param-names ,@register-names)
                                             (declare (ignorable ,@param-names ,@register-names))
                                             ,@body)))
-              (,parameters (list ,@(build-parameter-list page param-specs))))
+              (,parameter-attributes (list ,@(build-parameter-attributes page param-specs))))
          (register-page ,page (or ,webapp (package-webapp)))
-         (setf (parameters ,page) ,parameters)
+         (setf (parameter-attributes ,page) ,parameter-attributes)
          (setf (scanner ,page)
                (create-scanner (concatenate 'string
                                             "^"
@@ -270,14 +278,13 @@ object). Return the page object. "
       (let ((*standard-output* stream))
         (funcall (body page))))))
 
-(defmacro define-static-page (name (base-url &key
-                                             (request-type :get)
-                                             (content-type *default-content-type*)
-                                             webapp-name
-                                             location)
+(defmacro define-static-page (name (base-url &key (request-type :get)
+                                                  (content-type *default-content-type*)
+                                                  webapp-name
+                                                  location)
                               (&rest param-specs)
                               &body body)
-  (with-gensyms (page parameters webapp)
+  (with-gensyms (page parameter-attributes webapp)
     (let ((parameter-names (build-parameter-names param-specs)))
       `(let* ((,webapp (find-webapp ,webapp-name))
               (,page (make-instance 'static-page
@@ -289,8 +296,8 @@ object). Return the page object. "
                                     :content-type ,content-type
                                     :body (lambda ()
                                             ,@body)))
-              (,parameters (list ,@(build-parameter-list page param-specs))))
-         (setf (parameters ,page) ,parameters)
+              (,parameter-attributes (list ,@(build-parameter-attributes page param-specs))))
+         (setf (parameter-attributes ,page) ,parameter-attributes)
          (register-page ,page (or ,webapp (package-webapp)))
          (unless (location ,page)
            (setf (location ,page) (static-page-pathname ,page)))

@@ -121,17 +121,11 @@
 ;;; ----------------------------------------------------------------------
 
 (defclass http-parameter ()
-  ((name       :accessor name       :initarg :name)
-   (key        :accessor key        :initarg :key)
-   (page       :accessor page       :initarg :page)
-   (lisp-type  :accessor lisp-type  :initarg :lisp-type)
-   (vfn        :accessor vfn        :initarg :vfn)
-   (vargs      :accessor vargs      :initarg :vargs)
+  ((attributes :accessor attributes :initarg :attributes)
    (val        :accessor val        :initarg :val)
    (raw        :accessor raw        :initarg :raw)
    (validp     :accessor validp     :initarg :validp)
    (error-type :accessor error-type :initarg :error-type)
-   (requiredp  :accessor requiredp  :initarg :requiredp)
    (suppliedp  :accessor suppliedp  :initarg :suppliedp)))
 
 
@@ -140,45 +134,48 @@
 ;;; run-time (request-time) parameter binding
 ;;; ----------------------------------------------------------------------
 
-(defun find-params (page names)
-  ;; We iterate instead of using remove-if-not or something similar so
-  ;; that we keep the order of the parameters unchanged
-  (let ((parameters (parameters page)))
-    (iter (for n in names)
-          (collect (find n parameters :key #'name)))))
-
-(defun parse-parameter (p raw)
-  (handler-case (let ((parsed (urlenc->lisp raw (lisp-type p))))
+(defun parse-parameter (attr raw)
+  (handler-case (let ((parsed (urlenc->lisp raw (lisp-type attr))))
                   (if (and (null parsed)
-                           (not (eql 'boolean (lisp-type p))))
-                      (setf (raw p) raw
-                            (val p) nil
-                            (validp p) (not (requiredp p))
-                            (suppliedp p) nil
-                            (error-type p) nil)
-                      (setf (raw p) raw
-                            (val p) parsed
-                            (validp p) t
-                            (suppliedp p) t
-                            (error-type p) nil)))
+                           (not (eql 'boolean (lisp-type attr))))
+                      (make-instance 'http-parameter
+                                     :attributes attr
+                                     :raw raw
+                                     :val nil
+                                     :validp (not (requiredp attr))
+                                     :suppliedp nil
+                                     :error-type nil)
+                      (make-instance 'http-parameter
+                                     :attributes attr
+                                     :raw raw
+                                     :val parsed
+                                     :validp t
+                                     :suppliedp t
+                                     :error-type nil)))
     (http-parse-error ()
-      (setf (raw p) raw
-            ;; leave val slot unbound
-            (validp p) nil
-            (suppliedp p) (if (null raw) nil t)
-            (error-type p) :parse-error))))
+      (make-instance 'http-parameter
+                     :attributes attr
+                     :raw raw
+                     ;; leave val slot unbound
+                     :validp nil
+                     :suppliedp (if (null raw) nil t)
+                     :error-type :parse-error))))
 
-(defun validate-parameter (p)
-  (let ((pargs (find-params (page p) (vargs p))))
-    (when (and (every #'suppliedp pargs)
-               (every #'validp pargs))
-      (let ((error-type (apply (vfn p) (mapcar #'val pargs))))
-        (when error-type
-          (slot-makunbound p 'val)
-          (setf (validp p) nil)
-          (setf (error-type p) error-type))))))
+(defun validate-parameter (p parameters)
+  (flet ((find-params (names)
+           (iter (for n in names)
+                 (collect (find n parameters :key (compose #'name #'attributes))))))
+    (let* ((attr (attributes p))
+           (pargs (find-params (vargs attr))))
+      (when (and (every #'suppliedp pargs)
+                 (every #'validp pargs))
+        (let ((error-type (apply (vfn attr) (mapcar #'val pargs))))
+          (when error-type
+            (slot-makunbound p 'val)
+            (setf (validp p) nil)
+            (setf (error-type p) error-type)))))))
 
-(defun set-parameters (page &optional query-string)
+(defun parse-parameters (page &optional query-string)
   (let ((query-alist (group-duplicate-keys (if (boundp '*request*)
                                                ;; normal behaviour
                                                (if (eql (request-type page) :get)
@@ -186,11 +183,15 @@
                                                    (post-parameters*))
                                                ;; useful for debugging
                                                (parse-query-string query-string)))))
-    (iter (for p in (parameters page))
-          (for raw = (cdr (assoc (string-downcase (name p)) query-alist :test #'string-equal)))
-          (parse-parameter p raw))
-    (iter (for p in (parameters page))
-          (validate-parameter p))))
+    (let ((parameters
+           (iter (for attr in (parameter-attributes page))
+                 (for raw = (cdr (assoc (string-downcase (name attr))
+                                        query-alist
+                                        :test #'string-equal)))
+                 (collect (parse-parameter attr raw)))))
+      (dolist (p parameters)
+        (validate-parameter p parameters))
+      parameters)))
 
 
 

@@ -54,7 +54,7 @@
    :content-type
    :request-type
    :handler
-   :parameters
+   :parameter-attributes
    :validators
    :body
    :path
@@ -64,6 +64,7 @@
    :register-names
    ;; page functions
    :*page*
+   :*parameters*
    :dynamic-page
    :static-page
    :external-page
@@ -86,6 +87,7 @@
    :urlenc->lisp
    :lisp->urlenc
    :lisp-type
+   :attributes
    :val
    :raw
    :validp
