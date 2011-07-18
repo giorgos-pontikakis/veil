@@ -81,17 +81,13 @@
   value)
 
 (defmethod urlenc->lisp (value (type (eql 'integer)))
-  (handler-case (if (string-equal value +html-false+)
-                    nil
-                    (parse-integer value))
+  (handler-case (parse-integer value)
     (parse-error () (error 'http-parse-error
                            :http-type type
                            :raw-value value))))
 
 (defmethod urlenc->lisp (value (type (eql 'float)))
-  (handler-case (if (string-equal value +html-false+)
-                    nil
-                    (parse-float value))
+  (handler-case (parse-float value)
     (parse-error () (error 'http-parse-error
                            :http-type type
                            :raw-value value))))
@@ -136,8 +132,7 @@
 
 (defun parse-parameter (attr raw)
   (handler-case (let ((parsed (urlenc->lisp raw (lisp-type attr))))
-                  (if (and (null parsed)
-                           (not (eql 'boolean (lisp-type attr))))
+                  (if (null raw)
                       (make-instance 'http-parameter
                                      :attributes attr
                                      :raw raw
