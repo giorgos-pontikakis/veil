@@ -94,7 +94,5 @@
    :suppliedp
    :requiredp
    :error-type
-   :find-parameter
    :validate-parameters
-   :val*
    :parse-date))

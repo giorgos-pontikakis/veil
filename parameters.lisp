@@ -194,20 +194,6 @@
 ;;; Exported utilities
 ;;; ------------------------------------------------------------
 
-(defun find-parameter (name &optional (page *page*))
-  (find name (parameters page) :key (if (keywordp name) #'key #'name)))
-
-(defun val* (param)
-  (cond
-    ;; parameter is null or it is not supplied: return nil
-    ((or (null param) (not (suppliedp param)))
-     nil)
-    ;; parameter supplied but erroneous: return raw
-    ((not (validp param))
-     (raw param))
-    ;; parameter supplied and ok: return val
-    (t (val param))))
-
 (defun validate-parameters (chk-fn &rest parameters)
   (when (and (some #'suppliedp parameters)
              (every #'validp parameters))
