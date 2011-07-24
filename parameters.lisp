@@ -151,7 +151,7 @@
       (make-instance 'http-parameter
                      :attributes attr
                      :raw raw
-                     ;; leave val slot unbound
+                     :val raw
                      :validp nil
                      :suppliedp (if (null raw) nil t)
                      :error-type :parse-error))))
@@ -166,7 +166,7 @@
                  (every #'validp pargs))
         (let ((error-type (apply (vfn attr) (mapcar #'val pargs))))
           (when error-type
-            (slot-makunbound p 'val)
+            (setf (val p) (raw p))
             (setf (validp p) nil)
             (setf (error-type p) error-type)))))))
 
@@ -199,7 +199,7 @@
              (every #'validp parameters))
     (when-let (error-type (apply chk-fn (mapcar #'val parameters)))
       (mapc (lambda (p)
-              (slot-makunbound p 'val)
+              (setf (val p) (raw p))
               (setf (validp p) nil)
               (setf (error-type p) error-type))
             parameters))))
