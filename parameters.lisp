@@ -16,63 +16,28 @@
 
 
 ;;; ----------------------------------------------------------------------
-;;; Lisp - HTML and Lisp - URL encoding conversions
+;;; Lisp <-> URL-encoding conversions
 ;;; ----------------------------------------------------------------------
 
-(defparameter +html-true+ "true")
-(defparameter +html-false+ "false")
-(defparameter +html-null+ "")
+(defparameter +urlenc-true+ "true")
+(defparameter +urlenc-false+ "false")
+(defparameter +urlenc-null+ "")
 
-(defgeneric lisp->html (value))
 
 (defgeneric urlenc->lisp (string type))
 
-
-;; lisp to html
-
-(defmethod lisp->html ((value (eql t)))
-  +html-true+)
-
-(defmethod lisp->html ((value (eql :null)))
-  +html-null+)
-
-(defmethod lisp->html ((value (eql nil)))
-  +html-false+)
-
-(defmethod lisp->html ((value integer))
-  (format nil "~D" value))
-
-(defmethod lisp->html ((value rational))
-  (format nil "~,2F" value))
-
-(defmethod lisp->html ((value float))
-  (format nil "~,4F" value))
-
-(defmethod lisp->html ((value string))
-  (escape-for-html (format nil "~A" value)))
-
-(defmethod lisp->html ((value symbol))
-  (escape-for-html (format nil "~A" (string-downcase value))))
-
-(defmethod lisp->html ((value date))
-  (multiple-value-bind (year month day) (decode-date value)
-    (format nil "~A/~A/~A" day month year)))
-
-
-;; urlenc to lisp and vice versa
-
 (defun lisp->urlenc (value)
-  (url-encode (cond ((null value) +html-false+)
-                    ((eql value t) +html-true+)
-                    ((eql value :null) +html-null+)
+  (url-encode (cond ((null value) +urlenc-false+)
+                    ((eql value t) +urlenc-true+)
+                    ((eql value :null) +urlenc-null+)
                     (t (format nil "~A" value)))))
 
 (defmethod urlenc->lisp :around (value type)
   (cond ((null value)
          nil)
-        ((string-equal value +html-null+)
+        ((string-equal value +urlenc-null+)
          :null)
-        ((string-equal value +html-false+)
+        ((string-equal value +urlenc-false+)
          nil)
         (t
          (call-next-method (string-trim " " value) type))))
@@ -93,8 +58,8 @@
                            :raw-value value))))
 
 (defmethod urlenc->lisp (value (type (eql 'boolean)))
-  (cond ((string-equal value +html-true+)  t)
-        ((string-equal value +html-false+) nil)
+  (cond ((string-equal value +urlenc-true+)  t)
+        ((string-equal value +urlenc-false+) nil)
         (t (error 'http-parse-error
                   :http-type type
                   :raw-value value))))
@@ -102,14 +67,6 @@
 (defmethod urlenc->lisp (value (type (eql 'symbol)))
   (intern (string-upcase value)))
 
-(defmethod urlenc->lisp (value (type (eql 'date)))
-  (handler-case (if (string-equal value +html-false+)
-                    nil
-                    (parse-date value))
-    (error () ;; match all errors
-      (error 'http-parse-error
-             :http-type type
-             :raw-value value))))
 
 
 ;;; ----------------------------------------------------------------------
@@ -159,7 +116,7 @@
 (defun validate-parameter (p parameters)
   (flet ((find-params (names)
            (iter (for n in names)
-                 (collect (find n parameters :key (compose #'name #'attributes))))))
+                 (collect (find n parameters :key (compose #'param-name #'attributes))))))
     (let* ((attr (attributes p))
            (pargs (find-params (vargs attr))))
       (when (and (every #'suppliedp pargs)
@@ -180,7 +137,7 @@
                                                (parse-query-string query-string)))))
     (let ((parameters
            (iter (for attr in (parameter-attributes page))
-                 (for raw = (cdr (assoc (string-downcase (name attr))
+                 (for raw = (cdr (assoc (string-downcase (param-name attr))
                                         query-alist
                                         :test #'string-equal)))
                  (collect (parse-parameter attr raw)))))
@@ -191,7 +148,7 @@
 
 
 ;;; ------------------------------------------------------------
-;;; Exported utilities
+;;; A posteriori parameter validation
 ;;; ------------------------------------------------------------
 
 (defun validate-parameters (chk-fn &rest parameters)
@@ -203,9 +160,3 @@
               (setf (validp p) nil)
               (setf (error-type p) error-type))
             parameters))))
-
-(defun parse-date (value)
-  (destructuring-bind (day month year) (mapcar #'parse-integer (split "-|/|\\." value))
-    (encode-date (if (< year 1000) (+ year 2000) year)
-                 month
-                 day)))

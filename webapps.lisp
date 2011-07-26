@@ -17,26 +17,17 @@
 
 
 ;;; ----------------------------------------------------------------------
-;;; Default CL-WHO configuration
-;;; ----------------------------------------------------------------------
-
-(setf *attribute-quote-char* #\")
-(setf (html-mode) :xml)
-
-
-
-;;; ----------------------------------------------------------------------
 ;;; Web Application class
 ;;; ----------------------------------------------------------------------
 
 (defclass webapp ()
-  ((name           :accessor name           :initarg  :name)
+  ((appname        :accessor appname        :initarg  :appname)
    (pkg            :accessor pkg            :initarg  :pkg)
    (database       :accessor database       :initarg  :database)
    (pages          :reader   pages          :initform (make-hash-table))
    (port           :accessor port           :initarg  :port)
-   (fs-root        :accessor fs-root        :initarg  :fs-root)
    (doc-root       :accessor doc-root       :initarg  :doc-root)
+   (fs-root        :accessor fs-root        :initarg  :fs-root)
    (fs-paths       :accessor fs-paths       :initarg  :fs-paths)
    (web-root       :accessor web-root       :initarg  :web-root)
    (web-paths      :accessor web-paths      :initarg  :web-paths)
@@ -53,21 +44,21 @@
             (make-instance 'ssl-acceptor
                            :port (port webapp)
                            :request-dispatcher (make-hashtable-request-dispatcher webapp)
-                           :name (name webapp))
+                           :name (appname webapp))
             (make-instance 'acceptor
                            :port (port webapp)
                            :request-dispatcher (make-hashtable-request-dispatcher webapp)
-                           :name (name webapp))))
+                           :name (appname webapp))))
   (setf (published-p webapp) nil)
   (setf (pkg webapp) *package*))
 
 (defparameter *webapps* nil)
 
-(defun find-webapp (name)
-  (find name *webapps* :key #'name))
+(defun find-webapp (appname)
+  (find appname *webapps* :key #'appname))
 
 (defun register-webapp (webapp)
-  (pushnew webapp *webapps* :key #'name))
+  (pushnew webapp *webapps* :key #'appname))
 
 (defmacro define-webapp (parameter (&optional webapp-class) &body body)
   `(progn
@@ -85,37 +76,9 @@
 (defun package-webapp ()
   (if-let (app (find-symbol "*WEBAPP*" (package-name *package*)))
     (if (boundp app)
-        (find-webapp (name (symbol-value app)))
+        (find-webapp (appname (symbol-value app)))
         (error "Symbol *WEBAPP* is present in package but it is unbound."))
     (find-webapp (package-name *package*))))
-
-
-
-;; ----------------------------------------------------------------------
-;; Paths
-;; ----------------------------------------------------------------------
-
-(defun get-fs-path (id)
-  "Given an identifier, which is a symbol, return the filesystem path"
-  (cdr (assoc id (slot-value (package-webapp) 'fs-paths))))
-
-(defun (setf get-fs-path) (value id)
-  (let ((alist (fs-paths (package-webapp))))
-    (if (assoc id alist)
-        (rplacd (assoc id (fs-paths (package-webapp))) value)
-        (push (cons id value) (fs-paths (package-webapp))))
-    alist))
-
-(defun get-web-path (id)
-  "Given an identifier, which is a symbol, return the web path"
-  (cdr (assoc id (slot-value (package-webapp) 'web-paths))))
-
-(defun (setf get-web-path) (value id)
-  (let ((alist (slot-value (package-webapp) 'web-paths)))
-    (if (assoc id alist)
-        (rplacd (assoc id alist) value)
-        (push (cons id value) alist))
-    alist))
 
 
 
@@ -149,7 +112,7 @@
 ;; re-publishing it).
 
 ;; Therefore, we use a tabular data structure -- a hash table. We use
-;; the pages name as the key to remove the page from it. In this case,
+;; the page's name as the key to remove the page from it. In this case,
 ;; for every request we must transverse only the values of the hash
 ;; table.
 

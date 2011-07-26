@@ -7,37 +7,36 @@
 ;;; ----------------------------------------------------------------------
 
 (defclass page ()
-  ((name                 :accessor name                 :initarg :name)
-   (key                  :accessor key                  :initarg :key)
+  ((page-name            :accessor page-name            :initarg :page-name)
+   (page-key             :accessor page-key             :initarg :page-key)
    (webapp               :reader   webapp)
    (base-url             :accessor base-url             :initarg :base-url)
    (content-type         :accessor content-type         :initarg :content-type)
    (body                 :accessor body                 :initarg :body)
    (request-type         :accessor request-type         :initarg :request-type)
-   (parameter-attributes :accessor parameter-attributes :initarg :parameter-attributes)
-   (parameters           :accessor parameters           :initarg :parameters)))
+   (parameter-attributes :accessor parameter-attributes :initarg :parameter-attributes)))
 
 (defgeneric publisher (page)
   (:documentation "Return a function which, when called, returns the
   dispatcher for a page"))
 
-(defun find-page (name webapp)
+(defun find-page (page-name webapp)
   "Take the page name (a symbol) and a webapp designator (symbol or
 object). Return the page object. "
-  (gethash name (pages (ensure-webapp webapp))))
+  (gethash page-name (pages (ensure-webapp webapp))))
 
 (defun register-page (page webapp)
   "Add a page to a webapp's pages"
   (let ((app (ensure-webapp webapp)))
     (setf (slot-value page 'webapp) app)
-    (setf (gethash (name page) (pages app))
+    (setf (gethash (page-name page) (pages app))
           page)))
 
 (defun unregister-page (page-name webapp)
   "Remove a page from a webapp's pages"
   (let ((page (find-page page-name webapp)))
     (if page
-        (remhash (name page) (pages (webapp page)))
+        (remhash (page-name page) (pages (webapp page)))
         (error "Page ~A not found." page-name))))
 
 (defparameter *page* nil)
@@ -79,32 +78,31 @@ object). Return the page object. "
 ;;; ----------------------------------------------------------------------
 
 (defclass http-parameter-attributes ()
-  ((template  :accessor template  :initarg :template)
-   (name      :accessor name      :initarg :name)
-   (key       :accessor key       :initarg :key)
-   (page      :accessor page      :initarg :page)
-   (lisp-type :accessor lisp-type :initarg :lisp-type)
-   (vfn       :accessor vfn       :initarg :vfn)
-   (vargs     :accessor vargs     :initarg :vargs)
-   (requiredp :accessor requiredp :initarg :requiredp)))
+  ((param-name :accessor param-name :initarg :param-name)
+   (param-key  :accessor param-key  :initarg :param-key)
+   (param-page :accessor param-page :initarg :param-page)
+   (lisp-type  :accessor lisp-type  :initarg :lisp-type)
+   (vfn        :accessor vfn        :initarg :vfn)
+   (vargs      :accessor vargs      :initarg :vargs)
+   (requiredp  :accessor requiredp  :initarg :requiredp)))
 
 (defun build-parameter-attributes (page specs)
   (mapcar (lambda (spec)
-            (destructuring-bind (name &optional
+            (destructuring-bind (param-name &optional
                                       (lisp-type 'string)
                                       vspec
                                       requiredp) (ensure-list spec)
               `(make-instance 'http-parameter-attributes
-                              :name ',name
-                              :page ,page
-                              :key (make-keyword ',name)
+                              :param-name ',param-name
+                              :param-page ,page
+                              :param-key (make-keyword ',param-name)
                               :lisp-type ',lisp-type
                               :vfn ,(cond ((consp vspec) `(symbol-function ',(first vspec)))
                                           ((null vspec) '(constantly nil))
                                           (t `(symbol-function ',vspec)))
                               :vargs ',(cond ((consp vspec) (rest vspec))
                                              ((null vspec) nil)
-                                             (t (list name)))
+                                             (t (list param-name)))
                               :requiredp ',requiredp)))
           specs))
 
@@ -133,7 +131,7 @@ object). Return the page object. "
 
 (defmethod publisher ((page dynamic-page))
   #'(lambda ()
-      (setf (gethash (name page)
+      (setf (gethash (page-name page)
                      (dispatch-table (webapp page)))
             (lambda (request)
               (if (string= (full-base-url page)
@@ -148,17 +146,16 @@ object). Return the page object. "
         (with-output-to-string (*standard-output*)
           (apply (body page) *parameters*)))))
 
-(defmacro define-dynamic-page (name (base-url &key
-                                              (request-type :get)
-                                              (content-type *default-content-type*)
-                                              webapp-name)
+(defmacro define-dynamic-page (page-name (base-url &key (request-type :get)
+                                                        (content-type *default-content-type*)
+                                                        webapp-name)
                                (&rest param-specs) &body body)
   (with-gensyms (page parameter-attributes webapp)
     (let ((parameter-names (build-parameter-names param-specs)))
       `(let* ((,webapp (find-webapp ',webapp-name))
               (,page (make-instance 'dynamic-page
-                                    :name ',name
-                                    :key (make-keyword ',name)
+                                    :page-name ',page-name
+                                    :page-key (make-keyword ',page-name)
                                     :base-url ,base-url
                                     :request-type ,request-type
                                     :content-type ,content-type
@@ -168,8 +165,8 @@ object). Return the page object. "
               (,parameter-attributes (list ,@(build-parameter-attributes page param-specs))))
          (register-page ,page (or ,webapp (package-webapp)))
          (setf (parameter-attributes ,page) ,parameter-attributes)
-         (define-page-fn ,name (or ,webapp (package-webapp)) ,parameter-names)
-         (publish-page ',name (or ,webapp (package-webapp)))))))
+         (define-page-fn ,page-name (or ,webapp (package-webapp)) ,parameter-names)
+         (publish-page ',page-name (or ,webapp (package-webapp)))))))
 
 
 
@@ -182,7 +179,7 @@ object). Return the page object. "
 
 (defmethod publisher ((page regex-page))
   (lambda ()
-    (setf (gethash (name page)
+    (setf (gethash (page-name page)
                    (dispatch-table (webapp page)))
           (lambda (request)
             (multiple-value-bind (match regs) (scan-to-strings (scanner page)
@@ -199,7 +196,7 @@ object). Return the page object. "
         (apply (body page)
                (append *parameters* register-values))))))
 
-(defmacro define-regex-page (name (base-url &key
+(defmacro define-regex-page (page-name (base-url &key
                                             (request-type :get)
                                             (content-type *default-content-type*)
                                             webapp-name)
@@ -213,8 +210,8 @@ object). Return the page object. "
                                   base-url)))
       `(let* ((,webapp (find-webapp ',webapp-name))
               (,page (make-instance 'regex-page
-                                    :name ',name
-                                    :key (make-keyword ',name)
+                                    :page-name ',page-name
+                                    :page-key (make-keyword ',page-name)
                                     :base-url ',base-url
                                     :register-names ',register-names
                                     :url-fn (lambda ,register-names
@@ -241,8 +238,8 @@ object). Return the page object. "
                                                             item))
                                                       base-url)
                                             "$")))
-         (define-regex-page-fn ,name (or ,webapp (package-webapp)) ,register-names ,param-names)
-         (publish-page ',name (or ,webapp (package-webapp)))))))
+         (define-regex-page-fn ,page-name (or ,webapp (package-webapp)) ,register-names ,param-names)
+         (publish-page ',page-name (or ,webapp (package-webapp)))))))
 
 
 
@@ -255,7 +252,7 @@ object). Return the page object. "
 
 (defmethod publisher ((page static-page))
   (lambda ()
-    (setf (gethash (name page)
+    (setf (gethash (page-name page)
                    (dispatch-table (webapp page)))
           (lambda (request)
             (if (string= (full-base-url page)
@@ -278,7 +275,7 @@ object). Return the page object. "
       (let ((*standard-output* stream))
         (funcall (body page))))))
 
-(defmacro define-static-page (name (base-url &key (request-type :get)
+(defmacro define-static-page (page-name (base-url &key (request-type :get)
                                                   (content-type *default-content-type*)
                                                   webapp-name
                                                   location)
@@ -288,8 +285,8 @@ object). Return the page object. "
     (let ((parameter-names (build-parameter-names param-specs)))
       `(let* ((,webapp (find-webapp ,webapp-name))
               (,page (make-instance 'static-page
-                                    :name ',name
-                                    :key (make-keyword ',name)
+                                    :page-name ',page-name
+                                    :page-key (make-keyword ',page-name)
                                     :base-url ,base-url
                                     :location ,location
                                     :request-type ,request-type
@@ -301,8 +298,8 @@ object). Return the page object. "
          (register-page ,page (or ,webapp (package-webapp)))
          (unless (location ,page)
            (setf (location ,page) (static-page-pathname ,page)))
-         (define-page-fn ,name (or ,webapp (package-webapp)) ,parameter-names)
-         (publish-page ',name (or ,webapp (package-webapp)))))))
+         (define-page-fn ,page-name (or ,webapp (package-webapp)) ,parameter-names)
+         (publish-page ',page-name (or ,webapp (package-webapp)))))))
 
 (defun static-page-pathname (page)
   (let ((relative-path
@@ -333,7 +330,7 @@ object). Return the page object. "
     (iter (for (nil page) in-hashtable (pages app))
           (when (eql (type-of page) 'static-page)
             (funcall (builder page))
-            (collect (name page))))))
+            (collect (page-name page))))))
 
 
 
@@ -346,7 +343,7 @@ object). Return the page object. "
   (iter (for (nil page) in-hashtable (pages webapp))
         (unless (eql (type-of page) 'static-page)
           (funcall (publisher page))
-          (collect (name page)))))
+          (collect (page-name page)))))
 
 
 ;; -- Unpublish --
@@ -358,5 +355,5 @@ object). Return the page object. "
 ;; -- Published pages --
 
 (defun published-pages (webapp)
-  (iter (for (name nil) in-hashtable (dispatch-table (ensure-webapp webapp)))
-        (collect name)))
+  (iter (for (page-name nil) in-hashtable (dispatch-table (ensure-webapp webapp)))
+        (collect page-name)))

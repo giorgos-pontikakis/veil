@@ -1,37 +1,24 @@
 (in-package :cl-user)
 
 (defpackage :veil
-  (:use :common-lisp
-        :lisputils
-        :hunchentoot
-        :cl-who
-        :cl-ppcre
-        :iterate
-        :alexandria
-        :postmodern
-        :simple-date)
+  (:use "COMMON-LISP"
+        "ITERATE"
+        "ALEXANDRIA"
+        "HUNCHENTOOT"
+        "CL-PPCRE"
+        "LISPUTILS")
   (:export
-   :pack
-   ;; db
-   :db
-   ;; :define-db
-   :with-db
-   :select-dao-unique
    ;; webapp class
    :*webapps*
    :webapp
-   :name
    :pkg
    :database
-   ;; :root-path
-   ;; :public-path
-   ;; :root-dir
-   ;; :public-dir
    :pages
    :port
+   :doc-root
    :fs-root
-   :web-root
    :fs-paths
+   :web-root
    :web-paths
    :debug-p
    :acceptor-obj
@@ -39,8 +26,6 @@
    :dispatch-table
    :published-p
    ;; webapp functions
-   :get-fs-path
-   :get-web-path
    :define-webapp
    :find-webapp
    :register-webapp
@@ -49,15 +34,12 @@
    :package-webapp
    ;; page classes
    :page
-   :key
    :base-url
    :content-type
    :request-type
    :handler
    :parameter-attributes
    :validators
-   :body
-   :path
    :builder
    :publisher
    :url-fn
@@ -80,10 +62,9 @@
    :publish-page
    :publish-pages
    ;; parameters
-   :+html-true+
-   :+html-false+
-   :+html-null+
-   :lisp->html
+   :+urlenc-true+
+   :+urlenc-false+
+   :+urlenc-null+
    :urlenc->lisp
    :lisp->urlenc
    :lisp-type
@@ -95,4 +76,12 @@
    :requiredp
    :error-type
    :validate-parameters
-   :parse-date))
+   :parse-date
+   ;; paths
+   :url
+   :url*
+   :path
+   :url->path
+   :path->url
+   :path->url*
+   ))
