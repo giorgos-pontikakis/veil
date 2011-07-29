@@ -8,11 +8,19 @@
         "CL-PPCRE"
         "LISPUTILS")
   (:export
-   ;; webapp class
+   ;; Globals
    :*webapps*
+   :*page*
+   :*parameters*
+   ;; Constants
+   :+urlenc-true+
+   :+urlenc-false+
+   :+urlenc-null+
+   ;; webapp class
    :webapp
+   :webapp-name
    :pkg
-   :database
+   :db-connection-spec
    :pages
    :port
    :doc-root
@@ -21,7 +29,7 @@
    :web-root
    :web-paths
    :debug-p
-   :acceptor-obj
+   :acceptor
    :use-ssl-p
    :dispatch-table
    :published-p
@@ -32,21 +40,27 @@
    :publish-webapp
    :unpublish-webapp
    :package-webapp
-   ;; page classes
-   :page
+   ;; page class
+   :page-name
+   :webapp
    :base-url
    :content-type
    :request-type
    :handler
    :parameter-attributes
-   :validators
+   ;; Parameter attributes
+   :param-name
+   :param-key
+   :param-page
+   :requiredp
+   :lisp-type
+   :parse-date
+
    :builder
    :publisher
    :url-fn
    :register-names
    ;; page functions
-   :*page*
-   :*parameters*
    :dynamic-page
    :static-page
    :external-page
@@ -61,22 +75,17 @@
    :build-pages
    :publish-page
    :publish-pages
-   ;; parameters
-   :+urlenc-true+
-   :+urlenc-false+
-   :+urlenc-null+
+   ;; url encoding
    :urlenc->lisp
    :lisp->urlenc
-   :lisp-type
+   ;; parameters
    :attributes
    :val
    :raw
    :validp
-   :suppliedp
-   :requiredp
    :error-type
+   :suppliedp
    :validate-parameters
-   :parse-date
    ;; paths
    :url
    :url*
