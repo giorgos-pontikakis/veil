@@ -9,20 +9,18 @@
         "LISPUTILS")
   (:export
    ;; Globals
-   :*webapps*
+   :*acceptors*
    :*page*
    :*parameters*
    ;; Constants
    :+urlenc-true+
    :+urlenc-false+
    :+urlenc-null+
-   ;; webapp class
-   :webapp
-   :webapp-name
-   :pkg
+   ;; acceptor class
+   :veil-acceptor
+   :packages
    :db-connection-spec
    :pages
-   :port
    :doc-root
    :fs-root
    :fs-paths
@@ -33,16 +31,14 @@
    :use-ssl-p
    :dispatch-table
    :published-p
-   ;; webapp functions
-   :define-webapp
-   :find-webapp
-   :register-webapp
-   :publish-webapp
-   :unpublish-webapp
-   :package-webapp
+   ;; acceptor functions
+   :define-acceptor
+   :find-acceptor
+   :register-acceptor
+   :default-acceptor
+   :current-acceptor
    ;; page class
    :page-name
-   :webapp
    :base-url
    :content-type
    :request-type

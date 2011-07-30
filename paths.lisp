@@ -13,11 +13,11 @@
 
 (defun get-fs-path (id)
   "Given an identifier, which is a symbol, return the filesystem path"
-  (cdr (assoc id (fs-paths (package-webapp)))))
+  (cdr (assoc id (fs-paths (current-acceptor)))))
 
 (defun get-web-path (id)
   "Given an identifier, which is a symbol, return the web path"
-  (cdr (assoc id (web-paths (package-webapp)))))
+  (cdr (assoc id (web-paths (current-acceptor)))))
 
 
 
@@ -26,22 +26,22 @@
 (defun url* (&rest args)
   "Concatenates its arguments to produce a url path. Expects string or
 symbols as arguments. Symbols are used as keys to get values from
-web-paths of package-webapp."
+web-paths of current-acceptor."
   (unless (null args)
     (with-output-to-string (*standard-output*)
       (mapc #'princ-url args))))
 
 (defun url (&rest args)
-  "Same as url*, but it prepends web-root of package-webapp"
+  "Same as url*, but it prepends web-root of current-acceptor"
   (with-output-to-string (*standard-output*)
-    (princ (web-root (package-webapp)))
+    (princ (web-root (current-acceptor)))
     (unless (null args)
       (mapc #'princ-url args))))
 
 (defun path (&rest args)
   "Concatenates its arguments, prepending fs-root, to produce an
   absolute pathname. Expects string or symbols as arguments. Symbols
-  are used as keys to get values from fs-paths of package-webapp. If
+  are used as keys to get values from fs-paths of current-acceptor. If
   the final element is a string not ending with a slash, it is treated
   as filename "
   (let ((path (mapcar (lambda (arg)
@@ -62,18 +62,18 @@ web-paths of package-webapp."
         (rplaca (last path) (cl-fad:pathname-as-file (car (last path))))))
     (reduce (lambda (path1 path2)
               (merge-pathnames path1 path2))
-            (nreverse (cons (fs-root (package-webapp)) path)))))
+            (nreverse (cons (fs-root (current-acceptor)) path)))))
 
 
 (defun url->path (url)
-  (path (subseq url (length (web-root (package-webapp))))))
+  (path (subseq url (length (web-root (current-acceptor))))))
 
 (defun path->url (pathname &optional root)
   (url (enough-namestring pathname
                           (or root
-                              (fs-root (package-webapp))))))
+                              (fs-root (current-acceptor))))))
 
 (defun path->url* (pathname &optional root)
   (url* (enough-namestring pathname
                            (or root
-                               (fs-root (package-webapp))))))
+                               (fs-root (current-acceptor))))))
