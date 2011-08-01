@@ -1,6 +1,8 @@
 (in-package :veil)
 
 
+(defparameter *parameters* nil)
+
 
 ;;; ----------------------------------------------------------------------
 ;;; Conditions
@@ -73,6 +75,15 @@
 ;;; HTTP parameters
 ;;; ----------------------------------------------------------------------
 
+(defclass http-parameter-attributes ()
+  ((parameter-name :accessor parameter-name :initarg :parameter-name)
+   (parameter-key  :accessor parameter-key  :initarg :parameter-key)
+   (page           :accessor page           :initarg :page)
+   (lisp-type      :accessor lisp-type      :initarg :lisp-type)
+   (vfn            :accessor vfn            :initarg :vfn)
+   (vargs          :accessor vargs          :initarg :vargs)
+   (requiredp      :accessor requiredp      :initarg :requiredp)))
+
 (defclass http-parameter ()
   ((attributes :accessor attributes :initarg :attributes)
    (val        :accessor val        :initarg :val)
@@ -114,11 +125,11 @@
                      :error-type :parse-error))))
 
 (defun validate-parameter (p parameters)
-  (flet ((find-params (names)
+  (flet ((find-parameters (names)
            (iter (for n in names)
-                 (collect (find n parameters :key (compose #'param-name #'attributes))))))
+                 (collect (find-parameter n)))))
     (let* ((attr (attributes p))
-           (pargs (find-params (vargs attr))))
+           (pargs (find-parameters (vargs attr))))
       (when (and (every #'suppliedp pargs)
                  (every #'validp pargs))
         (let ((error-type (apply (vfn attr) (mapcar #'val pargs))))
@@ -137,7 +148,7 @@
                                                (parse-query-string query-string)))))
     (let ((parameters
            (iter (for attr in (parameter-attributes page))
-                 (for raw = (cdr (assoc (string-downcase (param-name attr))
+                 (for raw = (cdr (assoc (string-downcase (parameter-name attr))
                                         query-alist
                                         :test #'string-equal)))
                  (collect (parse-parameter attr raw)))))
@@ -148,10 +159,11 @@
 
 
 ;;; ------------------------------------------------------------
-;;; A posteriori parameter validation
+;;; Exported parameter utilities
 ;;; ------------------------------------------------------------
 
 (defun validate-parameters (chk-fn &rest parameters)
+  "A posteriori parameter validation"
   (when (and (some #'suppliedp parameters)
              (every #'validp parameters))
     (when-let (error-type (apply chk-fn (mapcar #'val parameters)))
@@ -160,3 +172,6 @@
               (setf (validp p) nil)
               (setf (error-type p) error-type))
             parameters))))
+
+(defun find-parameter (name)
+  (find name *parameters* :key (compose #'parameter-name #'attributes)))

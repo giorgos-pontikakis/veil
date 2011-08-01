@@ -3,21 +3,6 @@
 
 
 ;;; ----------------------------------------------------------------------
-;;; Parameter attributes
-;;; ----------------------------------------------------------------------
-
-(defclass http-parameter-attributes ()
-  ((param-name :accessor param-name :initarg :param-name)
-   (param-key  :accessor param-key  :initarg :param-key)
-   (page       :accessor page       :initarg :page)
-   (lisp-type  :accessor lisp-type  :initarg :lisp-type)
-   (vfn        :accessor vfn        :initarg :vfn)
-   (vargs      :accessor vargs      :initarg :vargs)
-   (requiredp  :accessor requiredp  :initarg :requiredp)))
-
-
-
-;;; ----------------------------------------------------------------------
 ;;; Web pages
 ;;; ----------------------------------------------------------------------
 
@@ -36,8 +21,8 @@
                   (destructuring-bind (param-name &optional (lisp-type 'string) vspec requiredp)
                       (ensure-list spec)
                     (make-instance 'http-parameter-attributes
-                                   :param-name param-name
-                                   :param-key (make-keyword param-name)
+                                   :parameter-name param-name
+                                   :parameter-key (make-keyword param-name)
                                    :page page
                                    :lisp-type lisp-type
                                    :vfn (cond ((consp vspec) (symbol-function (first vspec)))
@@ -72,7 +57,8 @@ acceptor. Return the page object. "))
         (error "Page ~A not found." page-name))))
 
 (defparameter *page* nil)
-(defparameter *parameters* nil)
+
+
 
 (defmacro define-page-fn (page-name acceptor &optional arguments)
   (with-gensyms (page param-value-alist)

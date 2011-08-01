@@ -45,13 +45,12 @@
    :handler
    :parameter-attributes
    ;; Parameter attributes
-   :param-name
-   :param-key
-   :param-page
+   :parameter-name
+   :parameter-key
+   :parameter-page
    :requiredp
    :lisp-type
    :parse-date
-
    :builder
    :publisher
    :url-fn
@@ -82,6 +81,7 @@
    :error-type
    :suppliedp
    :validate-parameters
+   :find-parameter
    ;; paths
    :url
    :url*
