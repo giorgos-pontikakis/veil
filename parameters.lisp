@@ -127,7 +127,7 @@
 (defun validate-parameter (p parameters)
   (flet ((find-parameters (names)
            (iter (for n in names)
-                 (collect (find-parameter n)))))
+                 (collect (find-parameter n parameters)))))
     (let* ((attr (attributes p))
            (pargs (find-parameters (vargs attr))))
       (when (and (every #'suppliedp pargs)
@@ -173,5 +173,5 @@
               (setf (error-type p) error-type))
             parameters))))
 
-(defun find-parameter (name)
-  (find name *parameters* :key (compose #'parameter-name #'attributes)))
+(defun find-parameter (name &optional (parameters *parameters*))
+  (find name parameters :key (compose #'parameter-name #'attributes)))
