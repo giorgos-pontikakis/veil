@@ -34,10 +34,6 @@
                                    :requiredp requiredp)))
                 param-specs)))
 
-(defgeneric publisher (page)
-  (:documentation "Return a function which, when called, returns the
-  dispatcher for a page"))
-
 (defgeneric find-page (page-name acceptor)
   (:documentation "Take the page name (a symbol) and an
 acceptor. Return the page object. "))
@@ -96,8 +92,11 @@ acceptor. Return the page object. "))
 ;;; ----------------------------------------------------------------------
 
 (defgeneric handler (page &key)
-  (:documentation "Return a function which, when called, returns the
-  handler for a page of class dynamic-page or its subclasses"))
+  (:documentation "Returns the handler function for a page"))
+
+(defgeneric dispatcher (page)
+  (:documentation "Returns the dispatch function for a page"))
+
 
 
 ;;; --- Dynamic pages ---
@@ -105,22 +104,19 @@ acceptor. Return the page object. "))
 (defclass dynamic-page (page)
   ())
 
-(defmethod publisher ((page dynamic-page))
-  #'(lambda ()
-      (setf (gethash (page-name page)
-                     (dispatch-table (acceptor page)))
-            (lambda (request)
-              (if (string= (full-base-url page)
-                           (script-name request))
-                  (handler page)
-                  nil)))))
+(defmethod dispatcher ((page dynamic-page))
+  (lambda (request)
+    (if (string= (full-base-url page)
+                 (script-name request))
+        (handler page)
+        nil)))
 
 (defmethod handler ((page dynamic-page) &key)
-  #'(lambda ()
-      (let ((*page* page)
-            (*parameters* (parse-parameters page)))
-        (with-output-to-string (*standard-output*)
-          (apply (body page) *parameters*)))))
+  (lambda ()
+    (let ((*page* page)
+          (*parameters* (parse-parameters page)))
+      (with-output-to-string (*standard-output*)
+        (apply (body page) *parameters*)))))
 
 (defmacro define-dynamic-page (page-name (base-url &key (request-type :get)
                                                         (content-type *default-content-type*)
@@ -165,16 +161,13 @@ acceptor. Return the page object. "))
                                                     (base-url page)))
                                      "$"))))
 
-(defmethod publisher ((page regex-page))
-  (lambda ()
-    (setf (gethash (page-name page)
-                   (dispatch-table (acceptor page)))
-          (lambda (request)
-            (multiple-value-bind (match regs) (scan-to-strings (scanner page)
-                                                               (script-name request))
-              (if match
-                  (handler page :register-values (coerce regs 'list))
-                  nil))))))
+(defmethod dispatcher ((page regex-page))
+  (lambda (request)
+    (multiple-value-bind (match regs) (scan-to-strings (scanner page)
+                                                       (script-name request))
+      (if match
+          (handler page :register-values (coerce regs 'list))
+          nil))))
 
 (defmethod handler ((page regex-page) &key register-values)
   (lambda ()
@@ -230,15 +223,12 @@ acceptor. Return the page object. "))
   (unless (location page)
     (setf (location page) (static-page-pathname page))))
 
-(defmethod publisher ((page static-page))
-  (lambda ()
-    (setf (gethash (page-name page)
-                   (dispatch-table (acceptor page)))
-          (lambda (request)
-            (if (string= (full-base-url page)
-                         (script-name request))
-                (handle-static-file (location page) (content-type page))
-                nil)))))
+(defmethod dispatcher ((page static-page))
+  (lambda (request)
+    (if (string= (full-base-url page)
+                 (script-name request))
+        (handle-static-file (location page) (content-type page))
+        nil)))
 
 (defgeneric builder (page)
   (:documentation "Return a function which, when called, writes the
@@ -301,25 +291,23 @@ acceptor. Return the page object. "))
 ;; -- Publish --
 
 (defun publish-page (page-name &optional (acceptor (default-acceptor)))
-  (funcall (publisher (find-page page-name acceptor))))
+  (setf (assoc-value (slot-value acceptor 'dispatch-table) page-name)
+        (dispatcher (find-page page-name acceptor))))
 
-(defun publish-pages (&optional (acceptor (default-acceptor)))
-  (iter (for (nil page) in-hashtable (pages acceptor))
-        (unless (eql (type-of page) 'static-page)
-          (funcall (publisher page))
-          (collect (page-name page)))))
 
 
 ;; -- Unpublish --
 
-;; Not implemented yet.
+(defun unpublish-page (page-name &optional (acceptor (default-acceptor)))
+  (setf (slot-value acceptor 'dispatch-table)
+        (remove page-name (dispatch-table acceptor) :key #'car)))
 
 
 
 ;; -- Published pages --
 
 (defun published-pages (&optional (acceptor (default-acceptor)))
-  (iter (for (page-name nil) in-hashtable (dispatch-table acceptor))
+  (iter (for (page-name . nil) in (dispatch-table acceptor))
         (collect page-name)))
 
 

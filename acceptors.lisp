@@ -28,28 +28,25 @@
    (web-root           :accessor web-root           :initarg  :web-root)
    (web-paths          :accessor web-paths          :initarg  :web-paths)
    (debug-p            :accessor debug-p            :initarg  :debug-p)
-   (acceptor           :accessor acceptor           :initarg  :acceptor)
    (pages              :reader   pages              :initform (make-hash-table))
    (packages           :reader   packages           :initarg  :packages)
-   (use-ssl-p          :reader   use-ssl-p          :initarg  :use-ssl-p)
-   (dispatch-table     :reader   dispatch-table     :initform (make-hash-table)))
-  (:default-initargs :use-ssl-p nil :fs-paths '() :web-paths '()
-                     :packages (list (package-name *package*))))
+   (dispatch-table     :reader   dispatch-table     :initform '()))
+  (:default-initargs :fs-paths '() :web-paths '() :packages (list (package-name *package*))))
 
 (defclass veil-acceptor (acceptor veil-acceptor-mixin)
   ()
   (:default-initargs :name (package-name *package*)
-                     :request-dispatcher (make-hashtable-request-dispatcher)))
+                     :request-dispatcher #'alist-request-dispatcher))
 
 (defclass veil-ssl-acceptor (ssl-acceptor veil-acceptor-mixin)
   ()
   (:default-initargs :name (package-name *package*)
-                     :request-dispatcher (make-hashtable-request-dispatcher)))
+                     :request-dispatcher #'alist-request-dispatcher))
 
 
 
 ;; ----------------------------------------------------------------------
-;; Dispatcher
+;; Association-list dispatcher
 ;; ----------------------------------------------------------------------
 
 ;; Note: The default Hunchentoot list-request-dispatcher contains a
@@ -59,22 +56,21 @@
 ;; remaining functions and finally re-register the page (but without
 ;; re-publishing it).
 
-;; Therefore, we use a tabular data structure -- a hash table. We use
-;; the page's name as the key to remove the page from it. In this case,
+;; Therefore, we use a tabular data structure -- an alist. We use the
+;; page's name as the key to remove the page from it. In this case,
 ;; for every request we must transverse only the values of the hash
 ;; table.
 
-(defun make-hashtable-request-dispatcher ()
+(defun alist-request-dispatcher (request)
   "Make a variation of the default list-request-dispatcher. It uses a
 hash table as the dispatch table of the veil-acceptor, instead of
 the *dispatch-table* list."
-  (lambda (request)
-    (iter (for (nil dispatcher) in-hashtable (dispatch-table *acceptor*))
-          (for action = (funcall dispatcher request))
-          (when action
-            (return (funcall action)))
-          (finally (setf (return-code* *reply*)
-                         +http-not-found+)))))
+  (iter (for (nil . dispatcher) in (dispatch-table *acceptor*))
+        (for action = (funcall dispatcher request))
+        (when action
+          (return (funcall action)))
+        (finally (setf (return-code* *reply*)
+                       +http-not-found+))))
 
 
 

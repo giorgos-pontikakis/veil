@@ -28,7 +28,6 @@
    :web-paths
    :debug-p
    :acceptor
-   :use-ssl-p
    :dispatch-table
    :published-p
    ;; acceptor functions
@@ -69,7 +68,8 @@
    :build-page
    :build-pages
    :publish-page
-   :publish-pages
+   :unpublish-page
+   :published-pages
    ;; url encoding
    :urlenc->lisp
    :lisp->urlenc
