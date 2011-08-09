@@ -1,9 +1,6 @@
 (in-package :veil)
 
 
-(defparameter *parameters* nil)
-
-
 ;;; ----------------------------------------------------------------------
 ;;; Conditions
 ;;; ----------------------------------------------------------------------
@@ -74,6 +71,10 @@
 ;;; ----------------------------------------------------------------------
 ;;; HTTP parameters
 ;;; ----------------------------------------------------------------------
+
+(defparameter *parameters* nil
+  "This is bound within the body of every page to the list of parsed
+  http-parameter objects")
 
 (defclass http-parameter-attributes ()
   ((parameter-name :accessor parameter-name :initarg :parameter-name)

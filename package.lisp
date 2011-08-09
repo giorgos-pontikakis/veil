@@ -42,7 +42,6 @@
    :content-type
    :request-type
    :acceptor
-   :body
    :parameter-attributes
    ;; Parameter attributes
    :parameter-name
@@ -53,7 +52,6 @@
    :parse-date
    :builder
    :publisher
-   :url-fn
    :register-names
    ;; page functions
    :dynamic-page

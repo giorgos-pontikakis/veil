@@ -15,7 +15,7 @@
    (acceptor             :reader   acceptor)
    (parameter-attributes :reader   parameter-attributes)))
 
-(defmethod initialize-instance :after ((page page) &key param-specs)
+(defmethod initialize-instance :after ((page page) &key parameter-specs)
   (setf (slot-value page 'parameter-attributes)
         (mapcar (lambda (spec)
                   (destructuring-bind (param-name &optional (lisp-type 'string) vspec requiredp)
@@ -32,7 +32,7 @@
                                                 ((null vspec) nil)
                                                 (t (list param-name)))
                                    :requiredp requiredp)))
-                param-specs)))
+                parameter-specs)))
 
 (defgeneric handler (page &key)
   (:documentation "Returns the handler function for a page"))
@@ -142,11 +142,11 @@
                                                         (content-type *default-content-type*)
                                                         (page-class 'dynamic-page)
                                                         acceptor)
-                               (&rest param-specs) &body body)
+                               (&rest parameter-specs) &body body)
   (with-gensyms (acc page)
-    (let ((parameter-names (collapse param-specs)))
+    (let ((parameter-names (collapse parameter-specs)))
       `(let* ((,acc (or ,acceptor (default-acceptor)))
-              (,page (make-instance ,page-class
+              (,page (make-instance ',page-class
                                     :page-name ',page-name
                                     :base-url ,base-url
                                     :content-type ,content-type
@@ -154,7 +154,7 @@
                                     :body (lambda (,@parameter-names)
                                             (declare (ignorable ,@parameter-names))
                                             ,@body)
-                                    :param-specs ',param-specs)))
+                                    :parameter-specs ',parameter-specs)))
          (register-page ,page ,acc)
          (publish-page ,page ,acc)
          (define-page-fn ,page-name ,acc ,parameter-names)))))
@@ -167,8 +167,7 @@
 
 (defclass regex-page (dynamic-page)
   ((scanner         :reader scanner)
-   (register-names  :accessor register-names  :initarg :register-names)
-   (url-fn          :accessor url-fn          :initarg :url-fn)))
+   (register-names  :reader register-names)))
 
 (defmethod initialize-instance :after ((page regex-page) &key)
   (setf (slot-value page 'scanner)
@@ -177,7 +176,11 @@
                                             "^"
                                             (web-root (acceptor page))
                                             (collapse (base-url page) #'second))
-                                     "$"))))
+                                     "$")))
+  (setf (slot-value page 'register-names)
+        (mapcan (lambda (i)
+                  (if (symbolp i) (list i) nil))
+                (base-url page))))
 
 (defmethod dispatcher ((page regex-page))
   (lambda (request)
@@ -199,23 +202,20 @@
                                                       (content-type *default-content-type*)
                                                       (page-class 'regex-page)
                                                       acceptor)
-                             (&rest param-specs) &body body)
+                             (&rest parameter-specs) &body body)
   (with-gensyms (acc page)
-    (let ((parameter-names (collapse param-specs))
+    (let ((parameter-names (collapse parameter-specs))
           (register-names (collapse base-url)))
       `(let* ((,acc (or ,acceptor (default-acceptor)))
-              (,page (make-instance ,page-class
+              (,page (make-instance ',page-class
                                     :page-name ',page-name
                                     :base-url ',base-url
-                                    :register-names ',register-names
-                                    :url-fn (lambda ,register-names
-                                              (concatenate 'string ,@(collapse base-url)))
-                                    :request-type ,request-type
                                     :content-type ,content-type
+                                    :request-type ,request-type
                                     :body (lambda (,@parameter-names ,@register-names)
                                             (declare (ignorable ,@parameter-names ,@register-names))
                                             ,@body)
-                                    :param-specs ',param-specs)))
+                                    :parameter-specs ',parameter-specs)))
          (register-page ,page ,acc)
          (publish-page ,page ,acc)
          (define-regex-page-fn ,page-name ,acc ,register-names ,parameter-names)))))
@@ -260,24 +260,23 @@
                                                        (content-type *default-content-type*)
                                                        (page-class 'static-page)
                                                        acceptor)
-                              (&rest param-specs)
+                              (&rest parameter-specs)
                               &body body)
   (with-gensyms (acc page)
-    (let ((parameter-names (collapse param-specs)))
+    (let ((parameter-names (collapse parameter-specs)))
       `(let* ((,acc (or ,acceptor (default-acceptor)))
-              (,page (make-instance ,page-class
+              (,page (make-instance ',page-class
                                     :page-name ',page-name
                                     :base-url ,base-url
-                                    :location ,location
-                                    :request-type ,request-type
                                     :content-type ,content-type
+                                    :request-type ,request-type
+                                    :location ,location
                                     :body (lambda ()
                                             ,@body)
-                                    :param-specs ',param-specs)))
+                                    :parameter-specs ',parameter-specs)))
          (register-page ,page ,acc)
          (publish-page ,page ,acc)
          (define-page-fn ,page-name ,acc ,parameter-names)))))
-
 
 
 
@@ -285,7 +284,7 @@
 ;;; Auxiliary
 ;;; ----------------------------------------------------------------------
 
-(defun collapse (list &optional fn)
+(defun collapse (list &optional (fn #'first))
   (mapcar (lambda (item)
             (if (listp item)
                 (funcall fn item)
@@ -321,10 +320,10 @@
                       (base-url ,page)
                       (make-query-string ,param-value-alist))))))
 
-(defmacro define-regex-page-fn (page-name acceptor registers &optional arguments)
+(defmacro define-regex-page-fn (page-name acceptor &optional arguments)
   (with-gensyms (page param-value-alist)
-    `(defun ,page-name ,(append registers
-                                (cons '&key (append arguments (list 'fragment))))
+    `(defun ,page-name ,(append (register-names page)
+                         (cons '&key (append arguments (list 'fragment))))
        (declare (ignorable ,@arguments fragment))
        (let ((,page (find-page ',page-name ,acceptor))
              (,param-value-alist (iter (for arg in ',arguments)
@@ -333,5 +332,17 @@
                                          (collect (cons arg val))))))
          (concatenate 'string
                       (web-root (acceptor ,page))
-                      (apply (url-fn ,page) (mapcar #'lisp->urlenc (list ,@registers)))
+                      (apply #'concatenate
+                             'string
+                             (substitute-from-list-if #'symbolp
+                                                      (collapse (base-url page))
+                                                      (list ,@(register-names page))))
                       (make-query-string ,param-value-alist))))))
+
+
+(defun substitute-from-list-if (predicate base-list substitutions-list)
+  (mapcar (lambda (item)
+            (if (funcall predicate item)
+                (pop substitutions-list)
+                item))
+          base-list))
