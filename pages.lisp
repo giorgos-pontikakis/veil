@@ -11,8 +11,8 @@
    (base-url             :accessor base-url             :initarg :base-url)
    (content-type         :accessor content-type         :initarg :content-type)
    (request-type         :accessor request-type         :initarg :request-type)
-   (acceptor             :accessor acceptor             :initarg :acceptor)
    (body                 :accessor body                 :initarg :body)
+   (acceptor             :reader   acceptor)
    (parameter-attributes :reader   parameter-attributes)))
 
 (defmethod initialize-instance :after ((page page) &key param-specs)
@@ -34,72 +34,92 @@
                                    :requiredp requiredp)))
                 param-specs)))
 
-(defgeneric find-page (page-name acceptor)
-  (:documentation "Take the page name (a symbol) and an
-acceptor. Return the page object. "))
-
-(defmethod find-page (page-name (acceptor veil-acceptor))
-  (gethash page-name (pages acceptor)))
-
-(defun register-page (page acceptor)
-  "Register a page so that it is served by an acceptor"
-  (setf (gethash (page-name page) (pages acceptor)) page))
-
-(defun unregister-page (page-name acceptor)
-  "Unregister a page so that it is not served by an acceptor"
-  (let ((page (find-page page-name acceptor)))
-    (if page
-        (remhash (page-name page) (pages acceptor))
-        (error "Page ~A not found." page-name))))
-
-(defparameter *page* nil)
-
-
-
-(defmacro define-page-fn (page-name acceptor &optional arguments)
-  (with-gensyms (page param-value-alist)
-    `(defun ,page-name ,(cons '&key (append arguments (list 'fragment)))
-       (declare (ignorable ,@arguments fragment))
-       (let ((,page (find-page ',page-name ,acceptor))
-             (,param-value-alist (iter (for arg in ',arguments)
-                                       (for val in (list ,@arguments))
-                                       (when val
-                                         (collect (cons arg val))))))
-         (concatenate 'string
-                      (web-root (acceptor ,page))
-                      (base-url ,page)
-                      (make-query-string ,param-value-alist))))))
-
-(defmacro define-regex-page-fn (page-name acceptor registers &optional arguments)
-  (with-gensyms (page param-value-alist)
-    `(defun ,page-name ,(append registers
-                                (cons '&key (append arguments (list 'fragment))))
-       (declare (ignorable ,@arguments fragment))
-       (let ((,page (find-page ',page-name ,acceptor))
-             (,param-value-alist (iter (for arg in ',arguments)
-                                       (for val in (list ,@arguments))
-                                       (when val
-                                         (collect (cons arg val))))))
-         (concatenate 'string
-                      (web-root (acceptor ,page))
-                      (apply (url-fn ,page) (mapcar #'lisp->urlenc (list ,@registers)))
-                      (make-query-string ,param-value-alist))))))
-
-
-
-;;; ----------------------------------------------------------------------
-;;; Dynamic and regex pages
-;;; ----------------------------------------------------------------------
-
 (defgeneric handler (page &key)
   (:documentation "Returns the handler function for a page"))
 
 (defgeneric dispatcher (page)
   (:documentation "Returns the dispatch function for a page"))
 
+(defparameter *page* nil
+  "This is bound within the body of every page to the page object itself")
 
 
-;;; --- Dynamic pages ---
+
+;;; ----------------------------------------------------------------------
+;;; Page operations
+;;; ----------------------------------------------------------------------
+
+;;; -- Find --
+
+(defun find-page (page-name acceptor)
+  "Given the page name (a symbol) and an acceptor, return the page object."
+  (gethash page-name (pages acceptor)))
+
+
+;;; -- Register --
+
+(defun register-page (page acceptor)
+  "Register a page so that it is served by an acceptor"
+  (setf (gethash (page-name page) (pages acceptor)) page)
+  (setf (slot-value page 'acceptor) acceptor))
+
+(defun unregister-page (page)
+  "Unregister a page so that it is not served by an acceptor"
+  (remhash (page-name page) (pages (acceptor page)))
+  (slot-makunbound page 'acceptor))
+
+
+;; -- Build --
+
+(defun build-page (page)
+  (funcall (builder page))
+  (values))
+
+(defun build-pages (&optional (acceptor (default-acceptor)))
+  (iter (for (nil page) in-hashtable (pages acceptor))
+        (when (eql (type-of page) 'static-page)
+          (build-page page)
+          (collect (page-name page)))))
+
+
+;; -- Publish --
+
+(defun publish-page (page &optional (acceptor (default-acceptor)))
+  (setf (assoc-value (slot-value acceptor 'dispatch-table) (page-name page))
+        (dispatcher page)))
+
+(defun publish-pages (&optional (acceptor (default-acceptor)))
+  (mapc #'(lambda (page)
+            (publish-page page acceptor))
+        (pages acceptor)))
+
+
+;; -- Unpublish --
+
+(defun unpublish-page (page)
+  (setf (slot-value (acceptor page) 'dispatch-table)
+        (remove page (dispatch-table (acceptor page)) :key #'cdr)))
+
+(defun unpublish-pages (&optional (acceptor (default-acceptor)))
+  (mapc #'(lambda (page)
+            (unpublish-page page))
+        (pages acceptor)))
+
+
+;; -- Published pages --
+
+(defun published-pages (&optional (acceptor (default-acceptor)))
+  (iter (for (page-name . nil) in (dispatch-table acceptor))
+        (collect page-name)))
+
+
+
+
+
+
+;;; ----------------------------------------------------------------------
+;;; Dynamic pages
+;;; ----------------------------------------------------------------------
 
 (defclass dynamic-page (page)
   ())
@@ -120,14 +140,14 @@ acceptor. Return the page object. "))
 
 (defmacro define-dynamic-page (page-name (base-url &key (request-type :get)
                                                         (content-type *default-content-type*)
+                                                        (page-class 'dynamic-page)
                                                         acceptor)
                                (&rest param-specs) &body body)
   (with-gensyms (acc page)
-    (let ((parameter-names (build-parameter-names param-specs)))
+    (let ((parameter-names (collapse param-specs)))
       `(let* ((,acc (or ,acceptor (default-acceptor)))
-              (,page (make-instance 'dynamic-page
+              (,page (make-instance ,page-class
                                     :page-name ',page-name
-                                    :acceptor ,acc
                                     :base-url ,base-url
                                     :content-type ,content-type
                                     :request-type ,request-type
@@ -136,12 +156,14 @@ acceptor. Return the page object. "))
                                             ,@body)
                                     :param-specs ',param-specs)))
          (register-page ,page ,acc)
-         (define-page-fn ,page-name ,acc ,parameter-names)
-         (publish-page ',page-name ,acc)))))
+         (publish-page ,page ,acc)
+         (define-page-fn ,page-name ,acc ,parameter-names)))))
 
 
 
-;;; --- Regex pages ---
+;;; ----------------------------------------------------------------------
+;;; Regex pages
+;;; ----------------------------------------------------------------------
 
 (defclass regex-page (dynamic-page)
   ((scanner         :reader scanner)
@@ -154,11 +176,7 @@ acceptor. Return the page object. "))
                                      (apply #'concatenate 'string
                                             "^"
                                             (web-root (acceptor page))
-                                            (mapcar (lambda (item)
-                                                      (if (listp item)
-                                                          (second item)
-                                                          item))
-                                                    (base-url page)))
+                                            (collapse (base-url page) #'second))
                                      "$"))))
 
 (defmethod dispatcher ((page regex-page))
@@ -179,27 +197,19 @@ acceptor. Return the page object. "))
 
 (defmacro define-regex-page (page-name (base-url &key (request-type :get)
                                                       (content-type *default-content-type*)
+                                                      (page-class 'regex-page)
                                                       acceptor)
                              (&rest param-specs) &body body)
   (with-gensyms (acc page)
-    (let ((parameter-names (build-parameter-names param-specs))
-          (register-names (mapcan (lambda (item)
-                                    (if (listp item)
-                                        (list (first item))
-                                        nil))
-                                  base-url)))
+    (let ((parameter-names (collapse param-specs))
+          (register-names (collapse base-url)))
       `(let* ((,acc (or ,acceptor (default-acceptor)))
-              (,page (make-instance 'regex-page
+              (,page (make-instance ,page-class
                                     :page-name ',page-name
-                                    :acceptor ,acc
                                     :base-url ',base-url
                                     :register-names ',register-names
                                     :url-fn (lambda ,register-names
-                                              (concatenate 'string ,@(mapcar (lambda (item)
-                                                                               (if (listp item)
-                                                                                   (first item)
-                                                                                   item))
-                                                                             base-url)))
+                                              (concatenate 'string ,@(collapse base-url)))
                                     :request-type ,request-type
                                     :content-type ,content-type
                                     :body (lambda (,@parameter-names ,@register-names)
@@ -207,8 +217,8 @@ acceptor. Return the page object. "))
                                             ,@body)
                                     :param-specs ',param-specs)))
          (register-page ,page ,acc)
-         (define-regex-page-fn ,page-name ,acc ,register-names ,parameter-names)
-         (publish-page ',page-name ,acc)))))
+         (publish-page ,page ,acc)
+         (define-regex-page-fn ,page-name ,acc ,register-names ,parameter-names)))))
 
 
 
@@ -248,15 +258,15 @@ acceptor. Return the page object. "))
 (defmacro define-static-page (page-name (base-url &key location
                                                        (request-type :get)
                                                        (content-type *default-content-type*)
+                                                       (page-class 'static-page)
                                                        acceptor)
                               (&rest param-specs)
                               &body body)
   (with-gensyms (acc page)
-    (let ((parameter-names (build-parameter-names param-specs)))
+    (let ((parameter-names (collapse param-specs)))
       `(let* ((,acc (or ,acceptor (default-acceptor)))
-              (,page (make-instance 'static-page
+              (,page (make-instance ,page-class
                                     :page-name ',page-name
-                                    :acceptor ,acc
                                     :base-url ,base-url
                                     :location ,location
                                     :request-type ,request-type
@@ -265,50 +275,9 @@ acceptor. Return the page object. "))
                                             ,@body)
                                     :param-specs ',param-specs)))
          (register-page ,page ,acc)
-         (define-page-fn ,page-name ,acc ,parameter-names)
-         (publish-page ',page-name ,acc)))))
+         (publish-page ,page ,acc)
+         (define-page-fn ,page-name ,acc ,parameter-names)))))
 
-
-
-;; ----------------------------------------------------------------------
-;; Build, Publish and Unpublish
-;; ----------------------------------------------------------------------
-
-;; -- Build --
-
-(defun build-page (page)
-  (funcall (builder page))
-  (values))
-
-(defun build-pages (&optional (acceptor (default-acceptor)))
-  (iter (for (nil page) in-hashtable (pages acceptor))
-        (when (eql (type-of page) 'static-page)
-          (funcall (builder page))
-          (collect (page-name page)))))
-
-
-
-;; -- Publish --
-
-(defun publish-page (page-name &optional (acceptor (default-acceptor)))
-  (setf (assoc-value (slot-value acceptor 'dispatch-table) page-name)
-        (dispatcher (find-page page-name acceptor))))
-
-
-
-;; -- Unpublish --
-
-(defun unpublish-page (page-name &optional (acceptor (default-acceptor)))
-  (setf (slot-value acceptor 'dispatch-table)
-        (remove page-name (dispatch-table acceptor) :key #'car)))
-
-
-
-;; -- Published pages --
-
-(defun published-pages (&optional (acceptor (default-acceptor)))
-  (iter (for (page-name . nil) in (dispatch-table acceptor))
-        (collect page-name)))
 
 
 
@@ -316,8 +285,12 @@ acceptor. Return the page object. "))
 ;;; Auxiliary
 ;;; ----------------------------------------------------------------------
 
-(defun build-parameter-names (spec)
-  (mapcar #'first (mapcar #'ensure-list spec)))
+(defun collapse (list &optional fn)
+  (mapcar (lambda (item)
+            (if (listp item)
+                (funcall fn item)
+                item))
+          list))
 
 (defun full-base-url (page)
   (concatenate 'string (web-root (acceptor page)) (base-url page)))
@@ -333,3 +306,32 @@ acceptor. Return the page object. "))
              (cl-fad:pathname-as-file
               (make-pathname :directory `(:relative ,@(split "/" (base-url page))))))))
     (merge-pathnames relative-path (doc-root (acceptor page)))))
+
+(defmacro define-page-fn (page-name acceptor &optional arguments)
+  (with-gensyms (page param-value-alist)
+    `(defun ,page-name ,(cons '&key (append arguments (list 'fragment)))
+       (declare (ignorable ,@arguments fragment))
+       (let ((,page (find-page ',page-name ,acceptor))
+             (,param-value-alist (iter (for arg in ',arguments)
+                                       (for val in (list ,@arguments))
+                                       (when val
+                                         (collect (cons arg val))))))
+         (concatenate 'string
+                      (web-root (acceptor ,page))
+                      (base-url ,page)
+                      (make-query-string ,param-value-alist))))))
+
+(defmacro define-regex-page-fn (page-name acceptor registers &optional arguments)
+  (with-gensyms (page param-value-alist)
+    `(defun ,page-name ,(append registers
+                                (cons '&key (append arguments (list 'fragment))))
+       (declare (ignorable ,@arguments fragment))
+       (let ((,page (find-page ',page-name ,acceptor))
+             (,param-value-alist (iter (for arg in ',arguments)
+                                       (for val in (list ,@arguments))
+                                       (when val
+                                         (collect (cons arg val))))))
+         (concatenate 'string
+                      (web-root (acceptor ,page))
+                      (apply (url-fn ,page) (mapcar #'lisp->urlenc (list ,@registers)))
+                      (make-query-string ,param-value-alist))))))

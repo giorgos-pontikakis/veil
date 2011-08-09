@@ -41,7 +41,8 @@
    :base-url
    :content-type
    :request-type
-   :handler
+   :acceptor
+   :body
    :parameter-attributes
    ;; Parameter attributes
    :parameter-name
@@ -64,10 +65,10 @@
    :define-dynamic-page
    :define-regex-page
    :define-static-page
-   :with-registers
    :build-page
    :build-pages
    :publish-page
+   :publish-pages
    :unpublish-page
    :published-pages
    ;; url encoding
