@@ -34,8 +34,8 @@
    :define-acceptor
    :find-acceptor
    :register-acceptor
+   :package-acceptor
    :default-acceptor
-   :current-acceptor
    ;; page class
    :page-name
    :base-url

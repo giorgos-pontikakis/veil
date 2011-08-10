@@ -92,14 +92,14 @@ the *dispatch-table* list."
      (register-acceptor ,parameter)
      (start ,parameter)))
 
-(defun default-acceptor ()
+(defun package-acceptor ()
   (find-if (lambda (acc)
              (member (package-name *package*)
                      (packages acc)
                      :test #'string-equal))
            *acceptors*))
 
-(defun current-acceptor ()
-  (if (boundp '*acceptor*)
+(defun default-acceptor ()
+  (if (boundp '*acceptor*)  ;;; Hunchentoot's acceptor
       *acceptor*
-      (default-acceptor)))
+      (package-acceptor)))

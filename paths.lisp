@@ -13,11 +13,11 @@
 
 (defun get-fs-path (id)
   "Given an identifier, which is a symbol, return the filesystem path"
-  (cdr (assoc id (fs-paths (current-acceptor)))))
+  (cdr (assoc id (fs-paths (default-acceptor)))))
 
 (defun get-web-path (id)
   "Given an identifier, which is a symbol, return the web path"
-  (cdr (assoc id (web-paths (current-acceptor)))))
+  (cdr (assoc id (web-paths (default-acceptor)))))
 
 
 
@@ -26,22 +26,22 @@
 (defun url* (&rest args)
   "Concatenates its arguments to produce a url path. Expects string or
 symbols as arguments. Symbols are used as keys to get values from
-web-paths of current-acceptor."
+web-paths of default-acceptor."
   (unless (null args)
     (with-output-to-string (*standard-output*)
       (mapc #'princ-url args))))
 
 (defun url (&rest args)
-  "Same as url*, but it prepends web-root of current-acceptor"
+  "Same as url*, but it prepends web-root of default-acceptor"
   (with-output-to-string (*standard-output*)
-    (princ (web-root (current-acceptor)))
+    (princ (web-root (default-acceptor)))
     (unless (null args)
       (mapc #'princ-url args))))
 
 (defun path (&rest args)
   "Concatenates its arguments, prepending fs-root, to produce an
   absolute pathname. Expects string or symbols as arguments. Symbols
-  are used as keys to get values from fs-paths of current-acceptor. If
+  are used as keys to get values from fs-paths of default-acceptor. If
   the final element is a string not ending with a slash, it is treated
   as filename "
   (let ((path (mapcar (lambda (arg)
@@ -62,18 +62,18 @@ web-paths of current-acceptor."
         (rplaca (last path) (cl-fad:pathname-as-file (car (last path))))))
     (reduce (lambda (path1 path2)
               (merge-pathnames path1 path2))
-            (nreverse (cons (fs-root (current-acceptor)) path)))))
+            (nreverse (cons (fs-root (default-acceptor)) path)))))
 
 
 (defun url->path (url)
-  (path (subseq url (length (web-root (current-acceptor))))))
+  (path (subseq url (length (web-root (default-acceptor))))))
 
 (defun path->url (pathname &optional root)
   (url (enough-namestring pathname
                           (or root
-                              (fs-root (current-acceptor))))))
+                              (fs-root (default-acceptor))))))
 
 (defun path->url* (pathname &optional root)
   (url* (enough-namestring pathname
                            (or root
-                               (fs-root (current-acceptor))))))
+                               (fs-root (default-acceptor))))))
