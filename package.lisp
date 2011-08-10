@@ -43,6 +43,7 @@
    :request-type
    :acceptor
    :parameter-attributes
+   :page-url
    ;; Parameter attributes
    :parameter-name
    :parameter-key
@@ -69,6 +70,7 @@
    :publish-pages
    :unpublish-page
    :published-pages
+   :define-page-function
    ;; url encoding
    :urlenc->lisp
    :lisp->urlenc

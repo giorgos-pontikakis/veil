@@ -7,15 +7,16 @@
 ;;; ----------------------------------------------------------------------
 
 (defclass page ()
-  ((page-name            :accessor page-name            :initarg :page-name)
-   (base-url             :accessor base-url             :initarg :base-url)
-   (content-type         :accessor content-type         :initarg :content-type)
-   (request-type         :accessor request-type         :initarg :request-type)
-   (body                 :accessor body                 :initarg :body)
-   (acceptor             :reader   acceptor)
-   (parameter-attributes :reader   parameter-attributes)))
+  ((page-name            :accessor       page-name            :initarg :page-name)
+   (base-url             :accessor       base-url             :initarg :base-url)
+   (content-type         :accessor       content-type         :initarg :content-type)
+   (request-type         :accessor       request-type         :initarg :request-type)
+   (body                 :accessor       body                 :initarg :body)
+   (parameter-specs      :accessor       parameter-specs      :initarg :parameter-specs)
+   (acceptor             :reader         acceptor)
+   (parameter-attributes :reader         parameter-attributes)))
 
-(defmethod initialize-instance :after ((page page) &key parameter-specs)
+(defmethod initialize-instance :after ((page page) &key)
   (setf (slot-value page 'parameter-attributes)
         (mapcar (lambda (spec)
                   (destructuring-bind (param-name &optional (lisp-type 'string) vspec requiredp)
@@ -32,7 +33,7 @@
                                                 ((null vspec) nil)
                                                 (t (list param-name)))
                                    :requiredp requiredp)))
-                parameter-specs)))
+                (parameter-specs page))))
 
 (defgeneric handler (page &key)
   (:documentation "Returns the handler function for a page"))
@@ -40,8 +41,53 @@
 (defgeneric dispatcher (page)
   (:documentation "Returns the dispatch function for a page"))
 
+(defgeneric register-names (page)
+  (:documentation "If the page is of class regex, it returns the
+  register names as a list of symbols."))
+
+(defmethod register-names ((page page))
+  nil)
+
+(defgeneric parameter-names (page)
+  (:documentation "If the page is of class regex, it returns the
+  parameter names as a list of symbols."))
+
+(defmethod parameter-names ((page page))
+  (mapcar #'parameter-name (parameter-attributes page)))
+
 (defparameter *page* nil
   "This is bound within the body of every page to the page object itself")
+
+(defgeneric page-url (page))
+
+(defmethod page-url ((page page))
+  (lambda (registers parameters)
+    (declare (ignore registers))
+    (with-output-to-string (stream)
+      ;; web root
+      (princ (web-root (acceptor page)) stream)
+      ;; base url
+      (princ (base-url page))
+      ;; query
+      (princ-http-query parameters stream))))
+
+(defun princ-http-query (parameters &optional (stream *standard-output*))
+  (iter (for key in parameters by #'cddr)
+        (for val in (rest parameters) by #'cddr)
+        (princ (if (first-time-p) #\? #\&) stream)
+        (when val
+          (princ (string-downcase key) stream)
+          (princ #\= stream)
+          (princ (lisp->urlenc val) stream))))
+
+
+(defmacro define-page-function (page-name register-names parameter-names)
+  `(defun ,page-name ,(append register-names
+                       (cons '&key (append parameter-names (list 'fragment))))
+     (declare (ignorable fragment))
+     (funcall (page-url (find-page ',page-name)) ;;; caution acceptor missing
+              (list ,@register-names)
+              (list ,@parameter-names))))
 
 
 
@@ -51,7 +97,7 @@
 
 ;;; -- Find --
 
-(defun find-page (page-name acceptor)
+(defun find-page (page-name &optional (acceptor (default-acceptor)))
   "Given the page name (a symbol) and an acceptor, return the page object."
   (gethash page-name (pages acceptor)))
 
@@ -114,9 +160,6 @@
 
 
 
-
-
-
 ;;; ----------------------------------------------------------------------
 ;;; Dynamic pages
 ;;; ----------------------------------------------------------------------
@@ -151,13 +194,13 @@
                                     :base-url ,base-url
                                     :content-type ,content-type
                                     :request-type ,request-type
+                                    :parameter-specs ',parameter-specs
                                     :body (lambda (,@parameter-names)
                                             (declare (ignorable ,@parameter-names))
-                                            ,@body)
-                                    :parameter-specs ',parameter-specs)))
+                                            ,@body))))
          (register-page ,page ,acc)
          (publish-page ,page ,acc)
-         (define-page-fn ,page-name ,acc ,parameter-names)))))
+         (define-page-function ,page-name nil ,parameter-names)))))
 
 
 
@@ -166,8 +209,7 @@
 ;;; ----------------------------------------------------------------------
 
 (defclass regex-page (dynamic-page)
-  ((scanner         :reader scanner)
-   (register-names  :reader register-names)))
+  ((scanner         :reader scanner)))
 
 (defmethod initialize-instance :after ((page regex-page) &key)
   (setf (slot-value page 'scanner)
@@ -176,11 +218,28 @@
                                             "^"
                                             (web-root (acceptor page))
                                             (collapse (base-url page) #'second))
-                                     "$")))
-  (setf (slot-value page 'register-names)
-        (mapcan (lambda (i)
-                  (if (symbolp i) (list i) nil))
-                (base-url page))))
+                                     "$"))))
+
+(defmethod register-names ((page regex-page))
+  (mapcan (lambda (i)
+            (if (symbolp i)
+                (list i)
+                nil))
+          (base-url page)))
+
+(defmethod page-url ((page regex-page))
+  (lambda (registers parameters)
+    (with-output-to-string (stream)
+      ;; web root
+      (princ (web-root (acceptor page)) stream)
+      ;; base url
+      (mapc (lambda (item)
+              (if (symbolp item)
+                  (princ (pop registers) stream)
+                  (princ item stream)))
+            (collapse (base-url page)))
+      ;; query
+      (princ-http-query parameters stream))))
 
 (defmethod dispatcher ((page regex-page))
   (lambda (request)
@@ -218,7 +277,7 @@
                                     :parameter-specs ',parameter-specs)))
          (register-page ,page ,acc)
          (publish-page ,page ,acc)
-         (define-regex-page-fn ,page-name ,acc ,register-names ,parameter-names)))))
+         (define-page-function ,page-name ,register-names ,parameter-names)))))
 
 
 
@@ -276,7 +335,7 @@
                                     :parameter-specs ',parameter-specs)))
          (register-page ,page ,acc)
          (publish-page ,page ,acc)
-         (define-page-fn ,page-name ,acc ,parameter-names)))))
+         (define-page-function ,page-name nil ,parameter-names)))))
 
 
 
@@ -306,38 +365,71 @@
               (make-pathname :directory `(:relative ,@(split "/" (base-url page))))))))
     (merge-pathnames relative-path (doc-root (acceptor page)))))
 
-(defmacro define-page-fn (page-name acceptor &optional arguments)
-  (with-gensyms (page param-value-alist)
-    `(defun ,page-name ,(cons '&key (append arguments (list 'fragment)))
-       (declare (ignorable ,@arguments fragment))
-       (let ((,page (find-page ',page-name ,acceptor))
-             (,param-value-alist (iter (for arg in ',arguments)
-                                       (for val in (list ,@arguments))
-                                       (when val
-                                         (collect (cons arg val))))))
-         (concatenate 'string
-                      (web-root (acceptor ,page))
-                      (base-url ,page)
-                      (make-query-string ,param-value-alist))))))
 
-(defmacro define-regex-page-fn (page-name acceptor &optional arguments)
-  (with-gensyms (page param-value-alist)
-    `(defun ,page-name ,(append (register-names page)
-                         (cons '&key (append arguments (list 'fragment))))
-       (declare (ignorable ,@arguments fragment))
-       (let ((,page (find-page ',page-name ,acceptor))
-             (,param-value-alist (iter (for arg in ',arguments)
-                                       (for val in (list ,@arguments))
-                                       (when val
-                                         (collect (cons arg val))))))
-         (concatenate 'string
-                      (web-root (acceptor ,page))
-                      (apply #'concatenate
-                             'string
-                             (substitute-from-list-if #'symbolp
-                                                      (collapse (base-url page))
-                                                      (list ,@(register-names page))))
-                      (make-query-string ,param-value-alist))))))
+
+;; (defmacro define-page-function (page)
+;;   (let ((page-name (page-name page))
+;;         (parameter-names (parameter-names page))
+;;         (register-names (register-names page)))
+;;     `(defun ,page-name ,(append register-names
+;;                          (cons '&key (append parameter-names (list 'fragment))))
+;;        (declare (ignorable fragment))
+;;        (concatenate 'string
+;;                     ,(web-root (acceptor page))
+;;                     (apply #'concatenate 'string
+;;                            (substitute-from-list-if #'symbolp
+;;                                                     ',(collapse (base-url page))
+;;                                                     (list ,@register-names)))
+;;                     (make-query-string (mapcan (lambda (name value)
+;;                                                  (when value
+;;                                                    (list (cons name value))))
+;;                                                ',parameter-names (list ,@parameter-names)))))))
+
+;; (defmacro define-page-fn (page)
+;;   (let ((page-name (page-name page))
+;;         (parameter-names (mapcar #'name (parameter-attributes page))))
+;;     `(defun ,page-name ,(cons '&key (append parameter-names (list 'fragment)))
+;;        (declare (ignorable fragment))
+;;        (concatenate 'string
+;;                     ,(web-root (acceptor page))
+;;                     ,(base-url page)
+;;                     (make-query-string (mapcan (lambda (name value)
+;;                                                  (when value
+;;                                                    (list (cons name value))))
+;;                                                ',parameter-names (list ,@parameter-names)))))))
+
+;; (defmacro define-page-fn (page-name acceptor &optional arguments)
+;;   (with-gensyms (page param-value-alist)
+;;     `(defun ,page-name ,(cons '&key (append arguments (list 'fragment)))
+;;        (declare (ignorable ,@arguments fragment))
+;;        (let ((,page (find-page ',page-name ,acceptor))
+;;              (,param-value-alist (iter (for arg in ',arguments)
+;;                                        (for val in (list ,@arguments))
+;;                                        (when val
+;;                                          (collect (cons arg val))))))
+;;          (concatenate 'string
+;;                       (web-root (acceptor ,page))
+;;                       (base-url ,page)
+;;                       (make-query-string ,param-value-alist))))))
+
+;; (defmacro define-regex-page-fn (page-name acceptor &optional arguments)
+;;   (with-gensyms (page param-value-alist)
+;;     `(defun ,page-name ,(append (register-names page)
+;;                          (cons '&key (append arguments (list 'fragment))))
+;;        (declare (ignorable ,@arguments fragment))
+;;        (let ((,page (find-page ',page-name ,acceptor))
+;;              (,param-value-alist (iter (for arg in ',arguments)
+;;                                        (for val in (list ,@arguments))
+;;                                        (when val
+;;                                          (collect (cons arg val))))))
+;;          (concatenate 'string
+;;                       (web-root (acceptor ,page))
+;;                       (apply #'concatenate
+;;                              'string
+;;                              (substitute-from-list-if #'symbolp
+;;                                                       (collapse (base-url page))
+;;                                                       (list ,@(register-names page))))
+;;                       (make-query-string ,param-value-alist))))))
 
 
 (defun substitute-from-list-if (predicate base-list substitutions-list)

@@ -17,12 +17,3 @@
               (cons (string-downcase (first pair))
                     (second pair))))
           (split "&" string)))
-
-(defun make-query-string (param-value-alist)
-  (with-output-to-string (*standard-output*)
-    (iter (for (sym . val) in param-value-alist)
-          (princ (if (first-time-p) #\? #\&))
-          (when val
-            (princ (string-downcase sym))
-            (princ #\=)
-            (princ (lisp->urlenc val))))))
