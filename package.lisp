@@ -56,14 +56,15 @@
    :register-names
    ;; page functions
    :dynamic-page
+   :regex-page
    :static-page
-   :external-page
    :find-page
    :register-page
    :unregister-page
    :define-dynamic-page
    :define-regex-page
    :define-static-page
+   :defpage
    :build-page
    :build-pages
    :publish-page

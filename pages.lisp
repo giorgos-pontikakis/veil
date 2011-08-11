@@ -45,7 +45,7 @@
   (:documentation "If the page is of class regex, it returns the
   register names as a list of symbols."))
 
-(defmethod register-names ((obj page))
+(defmethod register-names ((obj t))
   nil)
 
 (defmethod register-names ((obj list))
@@ -102,8 +102,10 @@
 
 ;;; -- Register --
 
-(defun register-page (page acceptor)
-  "Register a page so that it is served by an acceptor"
+(defgeneric register-page (page acceptor)
+  (:documentation "Register a page so that it is served by an acceptor"))
+
+(defmethod register-page ((page page) acceptor)
   (setf (gethash (page-name page) (pages acceptor)) page)
   (setf (slot-value page 'acceptor) acceptor))
 
@@ -188,7 +190,7 @@
 (defclass regex-page (dynamic-page)
   ((scanner :reader scanner)))
 
-(defmethod initialize-instance :after ((page regex-page) &key)
+(defmethod register-page :after ((page regex-page) acceptor)
   (setf (slot-value page 'scanner)
         (create-scanner (with-output-to-string (stream)
                           ;; web root
@@ -252,8 +254,8 @@
 (defclass static-page (page)
   ((location :accessor location :initarg :location)))
 
-(defmethod initialize-instance :after ((page static-page) &key)
-  (unless (location page)
+(defmethod register-page :after ((page static-page) acceptor)
+  (unless (slot-boundp page 'location)
     (setf (location page) (static-page-pathname page))))
 
 (defmethod dispatcher ((page static-page))
@@ -388,23 +390,26 @@
          (define-page-function ,acceptor-name ,page-name nil ,parameter-names)))))
 
 
-;; (defmacro defpage (page-class page-name (base-url &key (request-type :get)
-;;                                                        (content-type *default-content-type*)
-;;                                                        acceptor-name)
-;;                    (&rest parameter-specs) &body body)
-;;   (with-gensyms (acc page)
-;;     (let ((parameter-names (parameter-names parameter-specs))
-;;           (register-names (register-names base-url)))
-;;       `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
-;;               (,page (apply #'make-instance ',page-class
-;;                             :page-name ',page-name
-;;                             :base-url ',base-url
-;;                             :content-type ,content-type
-;;                             :request-type ,request-type
-;;                             :body (lambda (,@parameter-names ,@register-names)
-;;                                     (declare (ignorable ,@parameter-names ,@register-names))
-;;                                     ,@body)
-;;                             :parameter-specs ',parameter-specs)))
-;;          (register-page ,page ,acc)
-;;          (publish-page ,page ,acc)
-;;          (define-page-function ,acceptor-name ,page-name ,register-names ,parameter-names)))))
+(defmacro defpage (page-class page-name (base-url &rest initargs)
+                   (&rest parameter-specs) &body body)
+  (with-gensyms (acceptor page)
+    (let ((parameter-names (parameter-names parameter-specs))
+          (register-names (register-names base-url))
+          (acceptor-name (getf initargs :acceptor-name)))
+      `(let* ((,acceptor (or (find-acceptor ',acceptor-name) (default-acceptor)))
+              (,page (make-instance ',page-class
+                                    :page-name ',page-name
+                                    :base-url ',base-url
+                                    :content-type ,(getf initargs :content-type
+                                                         *default-content-type*)
+                                    :request-type ,(getf initargs :request-type :get)
+                                    :parameter-specs ',parameter-specs
+                                    :body (lambda (,@parameter-names ,@register-names)
+                                            (declare (ignorable ,@parameter-names ,@register-names))
+                                            ,@body)
+                                    ,@(remove-from-plist initargs
+                                                         :content-type :request-type
+                                                         :acceptor-name))))
+         (register-page ,page ,acceptor)
+         (publish-page ,page ,acceptor)
+         (define-page-function ,acceptor-name ,page-name ,register-names ,parameter-names)))))
