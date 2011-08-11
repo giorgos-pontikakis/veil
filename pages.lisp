@@ -179,27 +179,6 @@
       (with-output-to-string (*standard-output*)
         (apply (body page) *parameters*)))))
 
-(defmacro define-dynamic-page (page-name (base-url &key (request-type :get)
-                                                        (content-type *default-content-type*)
-                                                        (subclass 'dynamic-page)
-                                                        acceptor-name)
-                               (&rest parameter-specs) &body body)
-  (with-gensyms (acc page)
-    (let ((parameter-names (parameter-names parameter-specs)))
-      `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
-              (,page (make-instance ',subclass
-                                    :page-name ',page-name
-                                    :base-url ,base-url
-                                    :content-type ,content-type
-                                    :request-type ,request-type
-                                    :parameter-specs ',parameter-specs
-                                    :body (lambda (,@parameter-names)
-                                            (declare (ignorable ,@parameter-names))
-                                            ,@body))))
-         (register-page ,page ,acc)
-         (publish-page ,page ,acc)
-         (define-page-function ,acceptor-name ,page-name nil ,parameter-names)))))
-
 
 
 ;;; ----------------------------------------------------------------------
@@ -264,28 +243,6 @@
         (apply (body page)
                (append *parameters* register-values))))))
 
-(defmacro define-regex-page (page-name (base-url &key (request-type :get)
-                                                      (content-type *default-content-type*)
-                                                      (subclass 'regex-page)
-                                                      acceptor-name)
-                             (&rest parameter-specs) &body body)
-  (with-gensyms (acc page)
-    (let ((parameter-names (parameter-names parameter-specs))
-          (register-names (register-names base-url)))
-      `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
-              (,page (make-instance ',subclass
-                                    :page-name ',page-name
-                                    :base-url ',base-url
-                                    :content-type ,content-type
-                                    :request-type ,request-type
-                                    :body (lambda (,@parameter-names ,@register-names)
-                                            (declare (ignorable ,@parameter-names ,@register-names))
-                                            ,@body)
-                                    :parameter-specs ',parameter-specs)))
-         (register-page ,page ,acc)
-         (publish-page ,page ,acc)
-         (define-page-function ,acceptor-name ,page-name ,register-names ,parameter-names)))))
-
 
 
 ;;; ----------------------------------------------------------------------
@@ -320,29 +277,6 @@
                             :if-exists :supersede)
       (let ((*standard-output* stream))
         (funcall (body page))))))
-
-(defmacro define-static-page (page-name (base-url &key location
-                                                       (request-type :get)
-                                                       (content-type *default-content-type*)
-                                                       (subclass 'static-page)
-                                                       acceptor-name)
-                              (&rest parameter-specs)
-                              &body body)
-  (with-gensyms (acc page)
-    (let ((parameter-names (parameter-names parameter-specs)))
-      `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
-              (,page (make-instance ',subclass
-                                    :page-name ',page-name
-                                    :base-url ,base-url
-                                    :content-type ,content-type
-                                    :request-type ,request-type
-                                    :location ,location
-                                    :body (lambda ()
-                                            ,@body)
-                                    :parameter-specs ',parameter-specs)))
-         (register-page ,page ,acc)
-         (publish-page ,page ,acc)
-         (define-page-function ,acceptor-name ,page-name nil ,parameter-names)))))
 
 
 
@@ -380,6 +314,97 @@
   `(defun ,page-name ,(append register-names
                        (cons '&key (append parameter-names (list 'fragment))))
      (declare (ignorable fragment))
-     (funcall (page-url (find-page ',page-name) (find-acceptor ',acceptor-name))
+     (funcall (page-url (find-page ',page-name
+                                   (or (find-acceptor ',acceptor-name) (default-acceptor))))
               (list ,@register-names)
               (list ,@parameter-names))))
+
+;;; ------------------------------------------------------------
+
+(defmacro define-dynamic-page (page-name (base-url &key (request-type :get)
+                                                        (content-type *default-content-type*)
+                                                        (subclass 'dynamic-page)
+                                                        acceptor-name)
+                               (&rest parameter-specs) &body body)
+  (with-gensyms (acc page)
+    (let ((parameter-names (parameter-names parameter-specs)))
+      `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
+              (,page (make-instance ',subclass
+                                    :page-name ',page-name
+                                    :base-url ,base-url
+                                    :content-type ,content-type
+                                    :request-type ,request-type
+                                    :parameter-specs ',parameter-specs
+                                    :body (lambda (,@parameter-names)
+                                            (declare (ignorable ,@parameter-names))
+                                            ,@body))))
+         (register-page ,page ,acc)
+         (publish-page ,page ,acc)
+         (define-page-function ,acceptor-name ,page-name nil ,parameter-names)))))
+
+(defmacro define-regex-page (page-name (base-url &key (request-type :get)
+                                                      (content-type *default-content-type*)
+                                                      (subclass 'regex-page)
+                                                      acceptor-name)
+                             (&rest parameter-specs) &body body)
+  (with-gensyms (acc page)
+    (let ((parameter-names (parameter-names parameter-specs))
+          (register-names (register-names base-url)))
+      `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
+              (,page (make-instance ',subclass
+                                    :page-name ',page-name
+                                    :base-url ',base-url
+                                    :content-type ,content-type
+                                    :request-type ,request-type
+                                    :body (lambda (,@parameter-names ,@register-names)
+                                            (declare (ignorable ,@parameter-names ,@register-names))
+                                            ,@body)
+                                    :parameter-specs ',parameter-specs)))
+         (register-page ,page ,acc)
+         (publish-page ,page ,acc)
+         (define-page-function ,acceptor-name ,page-name ,register-names ,parameter-names)))))
+
+(defmacro define-static-page (page-name (base-url &key location
+                                                       (request-type :get)
+                                                       (content-type *default-content-type*)
+                                                       (subclass 'static-page)
+                                                       acceptor-name)
+                              (&rest parameter-specs)
+                              &body body)
+  (with-gensyms (acc page)
+    (let ((parameter-names (parameter-names parameter-specs)))
+      `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
+              (,page (make-instance ',subclass
+                                    :page-name ',page-name
+                                    :base-url ,base-url
+                                    :content-type ,content-type
+                                    :request-type ,request-type
+                                    :location ,location
+                                    :body (lambda ()
+                                            ,@body)
+                                    :parameter-specs ',parameter-specs)))
+         (register-page ,page ,acc)
+         (publish-page ,page ,acc)
+         (define-page-function ,acceptor-name ,page-name nil ,parameter-names)))))
+
+
+;; (defmacro defpage (page-class page-name (base-url &key (request-type :get)
+;;                                                        (content-type *default-content-type*)
+;;                                                        acceptor-name)
+;;                    (&rest parameter-specs) &body body)
+;;   (with-gensyms (acc page)
+;;     (let ((parameter-names (parameter-names parameter-specs))
+;;           (register-names (register-names base-url)))
+;;       `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
+;;               (,page (apply #'make-instance ',page-class
+;;                             :page-name ',page-name
+;;                             :base-url ',base-url
+;;                             :content-type ,content-type
+;;                             :request-type ,request-type
+;;                             :body (lambda (,@parameter-names ,@register-names)
+;;                                     (declare (ignorable ,@parameter-names ,@register-names))
+;;                                     ,@body)
+;;                             :parameter-specs ',parameter-specs)))
+;;          (register-page ,page ,acc)
+;;          (publish-page ,page ,acc)
+;;          (define-page-function ,acceptor-name ,page-name ,register-names ,parameter-names)))))
