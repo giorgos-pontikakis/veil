@@ -191,22 +191,23 @@
   ((scanner :reader scanner)))
 
 (defmethod register-page :after ((page regex-page) acceptor)
-  (setf (slot-value page 'scanner)
-        (create-scanner (with-output-to-string (stream)
-                          ;; web root
-                          (princ "^" stream)
-                          (princ (web-root (acceptor page)) stream)
-                          ;; base url
-                          (mapc (lambda (item)
-                                  (cond ((stringp item)
-                                         (princ item stream))
-                                        ((listp item)
-                                         (princ (first item) stream))
-                                        (t
-                                         (error "Malformed base-url for regex page scanner"))))
-                                (base-url page))
-                          ;; end
-                          (princ "$" stream)))))
+  (let ((scanner (with-output-to-string (stream)
+                   ;; web root
+                   (princ "^" stream)
+                   (princ (web-root (acceptor page)) stream)
+                   ;; base url
+                   (mapc (lambda (item)
+                           (cond ((stringp item)
+                                  (princ item stream))
+                                 ((listp item)
+                                  (princ (second item) stream))
+                                 (t
+                                  (error "Malformed base-url for regex page scanner"))))
+                         (base-url page))
+                   ;; end
+                   (princ "$" stream))))
+    (setf (slot-value page 'scanner)
+          (create-scanner scanner))))
 
 (defmethod register-names ((page regex-page))
   (register-names (base-url page)))
