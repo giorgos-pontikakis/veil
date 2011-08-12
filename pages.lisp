@@ -81,7 +81,7 @@
         ;; web root
         (princ (web-root (acceptor page)) stream)
         ;; base url
-        (princ (base-url page))
+        (princ (base-url page) stream)
         ;; query
         (princ-http-query parameter-keys parameters stream)))))
 
@@ -161,7 +161,7 @@
 
 
 ;;; ----------------------------------------------------------------------
-;;; Dynamic pages
+;;; DYNAMIC pages
 ;;; ----------------------------------------------------------------------
 
 (defclass dynamic-page (page)
@@ -184,7 +184,7 @@
 
 
 ;;; ----------------------------------------------------------------------
-;;; Regex pages
+;;; REGEX pages
 ;;; ----------------------------------------------------------------------
 
 (defclass regex-page (dynamic-page)
@@ -248,7 +248,7 @@
 
 
 ;;; ----------------------------------------------------------------------
-;;; Static pages
+;;; STATIC pages
 ;;; ----------------------------------------------------------------------
 
 (defclass static-page (page)
@@ -282,6 +282,45 @@
 
 
 
+;;; ------------------------------------------------------------
+;;; DEFPAGE macro
+;;; ------------------------------------------------------------
+
+(defmacro defpage (page-class page-name (base-url &rest initargs)
+                   (&rest parameter-specs) &body body)
+  (with-gensyms (acceptor page)
+    (let ((parameter-names (parameter-names parameter-specs))
+          (register-names (register-names base-url))
+          (acceptor-name (getf initargs :acceptor-name)))
+      `(let* ((,acceptor (or (find-acceptor ',acceptor-name) (default-acceptor)))
+              (,page (make-instance ',page-class
+                                    :page-name ',page-name
+                                    :base-url ',base-url
+                                    :content-type ,(getf initargs :content-type
+                                                         *default-content-type*)
+                                    :request-type ,(getf initargs :request-type :get)
+                                    :parameter-specs ',parameter-specs
+                                    :body (lambda (,@parameter-names ,@register-names)
+                                            (declare (ignorable ,@parameter-names ,@register-names))
+                                            ,@body)
+                                    ,@(remove-from-plist initargs
+                                                         :content-type :request-type
+                                                         :acceptor-name))))
+         (register-page ,page ,acceptor)
+         (publish-page ,page ,acceptor)
+         (define-page-function ,acceptor-name ,page-name ,register-names ,parameter-names)))))
+
+(defmacro define-page-function (acceptor-name page-name register-names parameter-names)
+  `(defun ,page-name ,(append register-names
+                       (cons '&key (append parameter-names (list 'fragment))))
+     (declare (ignorable fragment))
+     (funcall (page-url (find-page ',page-name
+                                   (or (find-acceptor ',acceptor-name) (default-acceptor))))
+              (list ,@register-names)
+              (list ,@parameter-names))))
+
+
+
 ;;; ----------------------------------------------------------------------
 ;;; Auxiliary
 ;;; ----------------------------------------------------------------------
@@ -310,106 +349,3 @@
                 (pop substitutions-list)
                 item))
           base-list))
-
-
-(defmacro define-page-function (acceptor-name page-name register-names parameter-names)
-  `(defun ,page-name ,(append register-names
-                       (cons '&key (append parameter-names (list 'fragment))))
-     (declare (ignorable fragment))
-     (funcall (page-url (find-page ',page-name
-                                   (or (find-acceptor ',acceptor-name) (default-acceptor))))
-              (list ,@register-names)
-              (list ,@parameter-names))))
-
-;;; ------------------------------------------------------------
-
-(defmacro define-dynamic-page (page-name (base-url &key (request-type :get)
-                                                        (content-type *default-content-type*)
-                                                        (subclass 'dynamic-page)
-                                                        acceptor-name)
-                               (&rest parameter-specs) &body body)
-  (with-gensyms (acc page)
-    (let ((parameter-names (parameter-names parameter-specs)))
-      `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
-              (,page (make-instance ',subclass
-                                    :page-name ',page-name
-                                    :base-url ,base-url
-                                    :content-type ,content-type
-                                    :request-type ,request-type
-                                    :parameter-specs ',parameter-specs
-                                    :body (lambda (,@parameter-names)
-                                            (declare (ignorable ,@parameter-names))
-                                            ,@body))))
-         (register-page ,page ,acc)
-         (publish-page ,page ,acc)
-         (define-page-function ,acceptor-name ,page-name nil ,parameter-names)))))
-
-(defmacro define-regex-page (page-name (base-url &key (request-type :get)
-                                                      (content-type *default-content-type*)
-                                                      (subclass 'regex-page)
-                                                      acceptor-name)
-                             (&rest parameter-specs) &body body)
-  (with-gensyms (acc page)
-    (let ((parameter-names (parameter-names parameter-specs))
-          (register-names (register-names base-url)))
-      `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
-              (,page (make-instance ',subclass
-                                    :page-name ',page-name
-                                    :base-url ',base-url
-                                    :content-type ,content-type
-                                    :request-type ,request-type
-                                    :body (lambda (,@parameter-names ,@register-names)
-                                            (declare (ignorable ,@parameter-names ,@register-names))
-                                            ,@body)
-                                    :parameter-specs ',parameter-specs)))
-         (register-page ,page ,acc)
-         (publish-page ,page ,acc)
-         (define-page-function ,acceptor-name ,page-name ,register-names ,parameter-names)))))
-
-(defmacro define-static-page (page-name (base-url &key location
-                                                       (request-type :get)
-                                                       (content-type *default-content-type*)
-                                                       (subclass 'static-page)
-                                                       acceptor-name)
-                              (&rest parameter-specs)
-                              &body body)
-  (with-gensyms (acc page)
-    (let ((parameter-names (parameter-names parameter-specs)))
-      `(let* ((,acc (or (find-acceptor ',acceptor-name) (default-acceptor)))
-              (,page (make-instance ',subclass
-                                    :page-name ',page-name
-                                    :base-url ,base-url
-                                    :content-type ,content-type
-                                    :request-type ,request-type
-                                    :location ,location
-                                    :body (lambda ()
-                                            ,@body)
-                                    :parameter-specs ',parameter-specs)))
-         (register-page ,page ,acc)
-         (publish-page ,page ,acc)
-         (define-page-function ,acceptor-name ,page-name nil ,parameter-names)))))
-
-
-(defmacro defpage (page-class page-name (base-url &rest initargs)
-                   (&rest parameter-specs) &body body)
-  (with-gensyms (acceptor page)
-    (let ((parameter-names (parameter-names parameter-specs))
-          (register-names (register-names base-url))
-          (acceptor-name (getf initargs :acceptor-name)))
-      `(let* ((,acceptor (or (find-acceptor ',acceptor-name) (default-acceptor)))
-              (,page (make-instance ',page-class
-                                    :page-name ',page-name
-                                    :base-url ',base-url
-                                    :content-type ,(getf initargs :content-type
-                                                         *default-content-type*)
-                                    :request-type ,(getf initargs :request-type :get)
-                                    :parameter-specs ',parameter-specs
-                                    :body (lambda (,@parameter-names ,@register-names)
-                                            (declare (ignorable ,@parameter-names ,@register-names))
-                                            ,@body)
-                                    ,@(remove-from-plist initargs
-                                                         :content-type :request-type
-                                                         :acceptor-name))))
-         (register-page ,page ,acceptor)
-         (publish-page ,page ,acceptor)
-         (define-page-function ,acceptor-name ,page-name ,register-names ,parameter-names)))))

@@ -21,8 +21,8 @@
 (defun princ-http-query (parameter-keys parameters &optional (stream *standard-output*))
   (iter (for key in parameter-keys)
         (for val in parameters)
-        (princ (if (first-time-p) #\? #\&) stream)
         (when val
+          (princ (if (first-time-p) #\? #\&) stream)
           (princ (string-downcase key) stream)
           (princ #\= stream)
           (princ (lisp->urlenc val) stream))))
