@@ -5,11 +5,10 @@
 (asdf:defsystem :veil
   :serial t
   :depends-on (:iterate
-                :alexandria
-                :hunchentoot
-                :cl-who
-                :cl-ppcre
-                :lisputils)
+               :alexandria
+               :hunchentoot
+               :cl-ppcre
+               :lisputils)
   :components ((:file "package")
                (:file "utils")
                (:file "acceptors")

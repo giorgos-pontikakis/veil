@@ -87,10 +87,12 @@ the *dispatch-table* list."
   (pushnew acceptor *acceptors* :key #'acceptor-name))
 
 (defmacro define-acceptor (parameter (&optional acceptor-class) &body body)
-  `(progn
-     (defvar ,parameter (make-instance (or ',acceptor-class 'veil-acceptor) ,@body))
-     (register-acceptor ,parameter)
-     (start ,parameter)))
+  (with-gensyms (acc)
+    `(defvar ,parameter
+       (let ((,acc (make-instance (or ',acceptor-class 'veil-acceptor) ,@body)))
+         (register-acceptor ,acc)
+         (start ,acc)
+         ,acc))))
 
 (defun package-acceptor ()
   (find-if (lambda (acc)
