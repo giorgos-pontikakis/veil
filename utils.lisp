@@ -18,8 +18,8 @@
                     (second pair))))
           (split "&" string)))
 
-(defun princ-http-query (parameter-keys parameters &optional (stream *standard-output*))
-  (iter (for key in parameter-keys)
+(defun princ-http-query (page parameters &optional (stream *standard-output*))
+  (iter (for key in (mapcar #'parameter-key (parameter-attributes page)))
         (for val in parameters)
         (when val
           (princ (if (first-time-p) #\? #\&) stream)

@@ -76,14 +76,13 @@
 (defmethod page-url ((page page))
   (lambda (registers parameters)
     (declare (ignore registers))
-    (let ((parameter-keys (mapcar #'parameter-key (parameter-attributes page))))
-      (with-output-to-string (stream)
-        ;; web root
-        (princ (web-root (acceptor page)) stream)
-        ;; base url
-        (princ (base-url page) stream)
-        ;; query
-        (princ-http-query parameter-keys parameters stream)))))
+    (with-output-to-string (stream)
+      ;; web root
+      (princ (web-root (acceptor page)) stream)
+      ;; base url
+      (princ (base-url page) stream)
+      ;; query
+      (princ-http-query page parameters stream))))
 
 (defparameter *page* nil
   "This is bound within the body of every page to the page object itself")
@@ -214,21 +213,20 @@
 
 (defmethod page-url ((page regex-page))
   (lambda (registers parameters)
-    (let ((parameter-keys (mapcar #'parameter-key (parameter-attributes page))))
-      (with-output-to-string (stream)
-        ;; web root
-        (princ (web-root (acceptor page)) stream)
-        ;; base url
-        (mapc (lambda (item)
-                (cond ((stringp item)
-                       (princ item stream))
-                      ((and (listp item) (symbolp (first item)))
-                       (princ (pop registers) stream))
-                      (t
-                       (error "Malformed base-url for regex page"))))
-              (base-url page))
-        ;; query
-        (princ-http-query parameter-keys parameters stream)))))
+    (with-output-to-string (stream)
+      ;; web root
+      (princ (web-root (acceptor page)) stream)
+      ;; base url
+      (mapc (lambda (item)
+              (cond ((stringp item)
+                     (princ item stream))
+                    ((and (listp item) (symbolp (first item)))
+                     (princ (pop registers) stream))
+                    (t
+                     (error "Malformed base-url for regex page"))))
+            (base-url page))
+      ;; query
+      (princ-http-query page parameters stream))))
 
 (defmethod dispatcher ((page regex-page))
   (lambda (request)
