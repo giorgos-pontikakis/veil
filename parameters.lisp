@@ -108,7 +108,9 @@
                                      :val nil
                                      :validp (not (requiredp attr))
                                      :suppliedp nil
-                                     :error-type nil)
+                                     :error-type (if (not (requiredp attr))
+                                                     nil
+                                                     :required-parameter-not-supplied))
                       (make-instance 'http-parameter
                                      :attributes attr
                                      :raw raw
