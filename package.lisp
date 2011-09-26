@@ -88,4 +88,7 @@
    :url->path
    :path->url
    :path->url*
+   ;; conditions
+   :http-parse-error
+   :validation-error
    ))
