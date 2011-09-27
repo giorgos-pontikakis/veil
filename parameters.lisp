@@ -23,13 +23,22 @@
 (defparameter +urlenc-null+ "")
 
 
+(defgeneric lisp->urlenc (value))
 (defgeneric urlenc->lisp (string type))
 
-(defun lisp->urlenc (value)
-  (url-encode (cond ((null value) +urlenc-false+)
-                    ((eql value t) +urlenc-true+)
-                    ((eql value :null) +urlenc-null+)
-                    (t (format nil "~A" value)))))
+
+(defmethod lisp->urlenc ((value (eql nil)))
+  +urlenc-false+)
+
+(defmethod lisp->urlenc ((value (eql t)))
+  +urlenc-true+)
+
+(defmethod lisp->urlenc ((value (eql :null)))
+  +urlenc-null+)
+
+(defmethod lisp->urlenc (value)
+  (url-encode (format nil "~A" value)))
+
 
 (defmethod urlenc->lisp :around (value type)
   (cond ((null value)
