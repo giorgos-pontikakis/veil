@@ -131,7 +131,7 @@
       (make-instance 'http-parameter
                      :attributes attr
                      :raw raw
-                     :val raw
+                     :val nil
                      :validp nil
                      :suppliedp (if (null raw) nil t)
                      :error-type :parse-error))))
@@ -146,7 +146,7 @@
                  (every #'validp pargs))
         (let ((error-type (apply (vfn attr) (mapcar #'val pargs))))
           (when error-type
-            (setf (val p) (raw p))
+            (setf (val p) nil)
             (setf (validp p) nil)
             (setf (error-type p) error-type)))))))
 
@@ -180,7 +180,7 @@
              (every #'validp parameters))
     (when-let (error-type (apply chk-fn (mapcar #'val parameters)))
       (mapc (lambda (p)
-              (setf (val p) (raw p))
+              (setf (val p) nil)
               (setf (validp p) nil)
               (setf (error-type p) error-type))
             parameters))))
