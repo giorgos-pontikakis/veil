@@ -21,7 +21,6 @@
    :packages
    :db-connection-spec
    :pages
-   :doc-root
    :fs-root
    :fs-paths
    :web-root

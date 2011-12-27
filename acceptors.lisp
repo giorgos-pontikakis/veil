@@ -22,7 +22,6 @@
 
 (defclass veil-acceptor-mixin ()
   ((db-connection-spec :accessor db-connection-spec :initarg  :db-connection-spec)
-   (doc-root           :accessor doc-root           :initarg  :doc-root)
    (fs-root            :accessor fs-root            :initarg  :fs-root)
    (fs-paths           :accessor fs-paths           :initarg  :fs-paths)
    (web-root           :accessor web-root           :initarg  :web-root)
@@ -35,13 +34,11 @@
 
 (defclass veil-acceptor (acceptor veil-acceptor-mixin)
   ()
-  (:default-initargs :name (package-name *package*)
-                     :request-dispatcher #'alist-request-dispatcher))
+  (:default-initargs :name (package-name *package*)))
 
 (defclass veil-ssl-acceptor (ssl-acceptor veil-acceptor-mixin)
   ()
-  (:default-initargs :name (package-name *package*)
-                     :request-dispatcher #'alist-request-dispatcher))
+  (:default-initargs :name (package-name *package*)))
 
 
 
@@ -61,7 +58,7 @@
 ;; for every request we must transverse only the values of the hash
 ;; table.
 
-(defun alist-request-dispatcher (request)
+(defmethod acceptor-dispatch-request ((acceptor veil-acceptor) request)
   "Make a variation of the default list-request-dispatcher. It uses a
 hash table as the dispatch table of the veil-acceptor, instead of
 the *dispatch-table* list."

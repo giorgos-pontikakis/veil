@@ -337,7 +337,7 @@
                             :type "html")
              (cl-fad:pathname-as-file
               (make-pathname :directory `(:relative ,@(split "/" (base-url page))))))))
-    (merge-pathnames relative-path (doc-root (acceptor page)))))
+    (merge-pathnames relative-path (document-root (acceptor page)))))
 
 
 
