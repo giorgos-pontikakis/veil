@@ -27,10 +27,14 @@
    (web-root           :accessor web-root           :initarg  :web-root)
    (web-paths          :accessor web-paths          :initarg  :web-paths)
    (debug-p            :accessor debug-p            :initarg  :debug-p)
-   (pages              :reader   pages              :initform (make-hash-table))
    (packages           :reader   packages           :initarg  :packages)
+   (autostart          :reader   autostart          :initarg  :autostart)
+   (pages              :reader   pages              :initform (make-hash-table))
    (dispatch-table     :reader   dispatch-table     :initform '()))
-  (:default-initargs :fs-paths '() :web-paths '() :packages (list (package-name *package*))))
+  (:default-initargs :fs-paths '()
+                     :web-paths '()
+                     :packages (list (package-name *package*))
+                     :autostart nil))
 
 (defclass veil-acceptor (acceptor veil-acceptor-mixin)
   ()
@@ -88,7 +92,8 @@ the *dispatch-table* list."
     `(defvar ,parameter
        (let ((,acc (make-instance (or ',acceptor-class 'veil-acceptor) ,@body)))
          (register-acceptor ,acc)
-         (start ,acc)
+         (when (autostart ,acc)
+           (start ,acc))
          ,acc))))
 
 (defun package-acceptor ()

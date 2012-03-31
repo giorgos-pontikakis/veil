@@ -26,6 +26,7 @@
    :web-root
    :web-paths
    :debug-p
+   :autostart
    :acceptor
    :dispatch-table
    :published-p
