@@ -17,11 +17,12 @@
 
 
 ;;; ----------------------------------------------------------------------
-;;; Veil Acceptors
+;;; Webapps
 ;;; ----------------------------------------------------------------------
 
-(defclass veil-acceptor-mixin ()
-  ((db-connection-spec :accessor db-connection-spec :initarg  :db-connection-spec)
+(defclass webapp ()
+  ((webapp-name        :accessor webapp-name        :initarg  :webapp-name)
+   (db-connection-spec :accessor db-connection-spec :initarg  :db-connection-spec)
    (fs-root            :accessor fs-root            :initarg  :fs-root)
    (fs-paths           :accessor fs-paths           :initarg  :fs-paths)
    (web-root           :accessor web-root           :initarg  :web-root)
@@ -29,20 +30,22 @@
    (debug-p            :accessor debug-p            :initarg  :debug-p)
    (packages           :reader   packages           :initarg  :packages)
    (autostart          :reader   autostart          :initarg  :autostart)
+   (acceptor           :accessor acceptor           :initarg  :acceptor)
    (pages              :reader   pages              :initform (make-hash-table))
    (dispatch-table     :reader   dispatch-table     :initform '()))
   (:default-initargs :fs-paths '()
                      :web-paths '()
                      :packages (list (package-name *package*))
-                     :autostart nil))
+                     :autostart nil
+                     :webapp-name (package-name *package*)))
 
-(defclass veil-acceptor (acceptor veil-acceptor-mixin)
-  ()
-  (:default-initargs :name (package-name *package*)))
+(defclass veil-acceptor (acceptor)
+  ((webapps :accessor webapps :initarg :webapps))
+  (:default-initargs :webapps '()))
 
-(defclass veil-ssl-acceptor (ssl-acceptor veil-acceptor-mixin)
-  ()
-  (:default-initargs :name (package-name *package*)))
+(defclass veil-ssl-acceptor (ssl-acceptor)
+  ((webapps :accessor webapps :initarg :webapps))
+  (:default-initargs :webapps '()))
 
 
 
@@ -66,44 +69,56 @@
   "Make a variation of the default list-request-dispatcher. It uses a
 hash table as the dispatch table of the veil-acceptor, instead of
 the *dispatch-table* list."
-  (iter (for (nil . dispatcher) in (dispatch-table *acceptor*))
-        (for action = (funcall dispatcher request))
-        (when action
-          (return (funcall action)))
-        (finally (setf (return-code* *reply*)
-                       +http-not-found+))))
+  (iter app-loop
+    (for app in (webapps *acceptor*))
+    (iter dispatcher-loop
+      (for (nil . dispatcher) in (dispatch-table app))
+      (for action = (funcall dispatcher request))
+      (when action
+        (return-from app-loop (funcall action))))
+    (finally (setf (return-code* *reply*)
+                   +http-not-found+))))
 
 
 
 ;; ----------------------------------------------------------------------
-;; Acceptor functions
+;; Webapp functions
 ;; ----------------------------------------------------------------------
 
-(defparameter *acceptors* nil)
+(defparameter *webapps* nil)
 
-(defun find-acceptor (acceptor-name)
-  (find acceptor-name *acceptors* :key #'acceptor-name :test #'equal))
+(defparameter *webapp* nil) ;; The webapp of the page that *acceptor* dispatches
 
-(defun register-acceptor (acceptor)
-  (pushnew acceptor *acceptors* :key #'acceptor-name))
+(defun find-webapp (webapp-name)
+  (find webapp-name *webapps* :key #'webapp-name :test #'equal))
 
-(defmacro define-acceptor (parameter (&optional acceptor-class) &body body)
-  (with-gensyms (acc)
+(defun register-webapp (webapp)
+  (pushnew webapp *webapps* :key #'webapp-name)
+  (push webapp (webapps (acceptor webapp))))
+
+(defun start-webapp (webapp)
+  (start (acceptor webapp)))
+
+(defun stop-webapp (webapp)
+  (stop (acceptor webapp)))
+
+
+(defmacro define-webapp (parameter (&optional webapp-class) &body body)
+  (with-gensyms (app)
     `(defvar ,parameter
-       (let ((,acc (make-instance (or ',acceptor-class 'veil-acceptor) ,@body)))
-         (register-acceptor ,acc)
-         (when (autostart ,acc)
-           (start ,acc))
-         ,acc))))
+       (let ((,app (make-instance (or ',webapp-class 'webapp) ,@body)))
+         (register-webapp ,app)
+         (when (autostart ,app)
+           (start-webapp ,app))
+         ,app))))
 
-(defun package-acceptor ()
-  (find-if (lambda (acc)
+(defun package-webapp ()
+  (find-if (lambda (app)
              (member (package-name *package*)
-                     (packages acc)
+                     (packages app)
                      :test #'string-equal))
-           *acceptors*))
+           *webapps*))
 
-(defun default-acceptor ()
-  (if (boundp '*acceptor*)  ;;; Hunchentoot's acceptor
-      *acceptor*
-      (package-acceptor)))
+(defun default-webapp ()
+  (or *webapp*
+      (package-webapp)))

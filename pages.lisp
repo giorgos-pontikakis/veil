@@ -13,7 +13,7 @@
    (request-type         :accessor request-type         :initarg :request-type)
    (body                 :accessor body                 :initarg :body)
    (parameter-specs      :accessor parameter-specs      :initarg :parameter-specs)
-   (acceptor             :reader   acceptor)
+   (webapp               :reader   webapp)
    (parameter-attributes :reader   parameter-attributes)))
 
 (defmethod initialize-instance :after ((page page) &key)
@@ -78,7 +78,7 @@
     (declare (ignore registers))
     (with-output-to-string (stream)
       ;; web root
-      (princ (web-root (acceptor page)) stream)
+      (princ (web-root (webapp page)) stream)
       ;; base url
       (princ (base-url page) stream)
       ;; query
@@ -94,24 +94,24 @@
 
 ;;; -- Find --
 
-(defun find-page (page-name &optional (acceptor (default-acceptor)))
-  "Given the page name (a symbol) and an acceptor, return the page object."
-  (gethash page-name (pages acceptor)))
+(defun find-page (page-name &optional (webapp (default-webapp)))
+  "Given the page name (a symbol) and an webapp, return the page object."
+  (gethash page-name (pages webapp)))
 
 
 ;;; -- Register --
 
-(defgeneric register-page (page acceptor)
-  (:documentation "Register a page so that it is served by an acceptor"))
+(defgeneric register-page (page webapp)
+  (:documentation "Register a page so that it is served by an webapp"))
 
-(defmethod register-page ((page page) acceptor)
-  (setf (gethash (page-name page) (pages acceptor)) page)
-  (setf (slot-value page 'acceptor) acceptor))
+(defmethod register-page ((page page) webapp)
+  (setf (gethash (page-name page) (pages webapp)) page)
+  (setf (slot-value page 'webapp) webapp))
 
 (defun unregister-page (page)
-  "Unregister a page so that it is not served by an acceptor"
-  (remhash (page-name page) (pages (acceptor page)))
-  (slot-makunbound page 'acceptor))
+  "Unregister a page so that it is not served by an webapp"
+  (remhash (page-name page) (pages (webapp page)))
+  (slot-makunbound page 'webapp))
 
 
 ;; -- Build --
@@ -120,8 +120,8 @@
   (funcall (builder page))
   (values))
 
-(defun build-pages (&optional (acceptor (default-acceptor)))
-  (iter (for (nil page) in-hashtable (pages acceptor))
+(defun build-pages (&optional (webapp (default-webapp)))
+  (iter (for (nil page) in-hashtable (pages webapp))
         (when (eql (type-of page) 'static-page)
           (build-page page)
           (collect (page-name page)))))
@@ -129,32 +129,32 @@
 
 ;; -- Publish --
 
-(defun publish-page (page &optional (acceptor (default-acceptor)))
-  (setf (assoc-value (slot-value acceptor 'dispatch-table) (page-name page))
+(defun publish-page (page &optional (webapp (default-webapp)))
+  (setf (assoc-value (slot-value webapp 'dispatch-table) (page-name page))
         (dispatcher page)))
 
-(defun publish-pages (&optional (acceptor (default-acceptor)))
+(defun publish-pages (&optional (webapp (default-webapp)))
   (mapc #'(lambda (page)
-            (publish-page page acceptor))
-        (pages acceptor)))
+            (publish-page page webapp))
+        (pages webapp)))
 
 
 ;; -- Unpublish --
 
 (defun unpublish-page (page)
-  (setf (slot-value (acceptor page) 'dispatch-table)
-        (remove page (dispatch-table (acceptor page)) :key #'cdr)))
+  (setf (slot-value (webapp page) 'dispatch-table)
+        (remove page (dispatch-table (webapp page)) :key #'cdr)))
 
-(defun unpublish-pages (&optional (acceptor (default-acceptor)))
+(defun unpublish-pages (&optional (webapp (default-webapp)))
   (mapc #'(lambda (page)
             (unpublish-page page))
-        (pages acceptor)))
+        (pages webapp)))
 
 
 ;; -- Published pages --
 
-(defun published-pages (&optional (acceptor (default-acceptor)))
-  (iter (for (page-name . nil) in (dispatch-table acceptor))
+(defun published-pages (&optional (webapp (default-webapp)))
+  (iter (for (page-name . nil) in (dispatch-table webapp))
         (collect page-name)))
 
 
@@ -175,7 +175,8 @@
 
 (defmethod handler ((page dynamic-page) &key)
   (lambda ()
-    (let ((*page* page)
+    (let ((*webapp* (webapp page))
+          (*page* page)
           (*parameters* (parse-parameters page)))
       (with-output-to-string (*standard-output*)
         (apply (body page) *parameters*)))))
@@ -189,11 +190,11 @@
 (defclass regex-page (dynamic-page)
   ((scanner :reader scanner)))
 
-(defmethod register-page :after ((page regex-page) acceptor)
+(defmethod register-page :after ((page regex-page) webapp)
   (let ((scanner (with-output-to-string (stream)
                    ;; web root
                    (princ "^" stream)
-                   (princ (web-root (acceptor page)) stream)
+                   (princ (web-root (webapp page)) stream)
                    ;; base url
                    (mapc (lambda (item)
                            (cond ((stringp item)
@@ -215,7 +216,7 @@
   (lambda (registers parameters)
     (with-output-to-string (stream)
       ;; web root
-      (princ (web-root (acceptor page)) stream)
+      (princ (web-root (webapp page)) stream)
       ;; base url
       (mapc (lambda (item)
               (cond ((stringp item)
@@ -238,7 +239,8 @@
 
 (defmethod handler ((page regex-page) &key register-values)
   (lambda ()
-    (let ((*page* page)
+    (let ((*webapp* (webapp page))
+          (*page* page)
           (*parameters* (parse-parameters page)))
       (with-output-to-string (*standard-output*)
         (apply (body page)
@@ -253,7 +255,7 @@
 (defclass static-page (page)
   ((location :accessor location :initarg :location)))
 
-(defmethod register-page :after ((page static-page) acceptor)
+(defmethod register-page :after ((page static-page) webapp)
   (unless (slot-boundp page 'location)
     (setf (location page) (static-page-pathname page))))
 
@@ -287,11 +289,11 @@
 
 (defmacro defpage (page-class page-name (base-url &rest initargs)
                    (&rest parameter-specs) &body body)
-  (with-gensyms (acceptor page)
+  (with-gensyms (webapp page)
     (let ((parameter-names (parameter-names parameter-specs))
           (register-names (register-names base-url))
-          (acceptor-name (getf initargs :acceptor-name)))
-      `(let* ((,acceptor (or (find-acceptor ',acceptor-name) (default-acceptor)))
+          (webapp-name (getf initargs :webapp-name)))
+      `(let* ((,webapp (or (find-webapp ',webapp-name) (default-webapp)))
               (,page (make-instance ',page-class
                                     :page-name ',page-name
                                     :base-url ',base-url
@@ -304,17 +306,17 @@
                                             ,@body)
                                     ,@(remove-from-plist initargs
                                                          :content-type :request-type
-                                                         :acceptor-name))))
-         (register-page ,page ,acceptor)
-         (publish-page ,page ,acceptor)
-         (define-page-function ,acceptor-name ,page-name ,register-names ,parameter-names)))))
+                                                         :webapp-name))))
+         (register-page ,page ,webapp)
+         (publish-page ,page ,webapp)
+         (define-page-function ,webapp-name ,page-name ,register-names ,parameter-names)))))
 
-(defmacro define-page-function (acceptor-name page-name register-names parameter-names)
+(defmacro define-page-function (webapp-name page-name register-names parameter-names)
   `(defun ,page-name ,(append register-names
                        (cons '&key (append parameter-names (list 'fragment))))
      (declare (ignorable fragment))
      (funcall (page-url (find-page ',page-name
-                                   (or (find-acceptor ',acceptor-name) (default-acceptor))))
+                                   (or (find-webapp ',webapp-name) (default-webapp))))
               (list ,@register-names)
               (list ,@parameter-names))))
 
@@ -325,19 +327,19 @@
 ;;; ----------------------------------------------------------------------
 
 (defun full-base-url (page)
-  (concatenate 'string (web-root (acceptor page)) (base-url page)))
+  (concatenate 'string (web-root (webapp page)) (base-url page)))
 
 (defun static-page-pathname (page)
   (let ((relative-path
-         (if (ends-with #\/ (base-url page))
-             (make-pathname :directory (if (emptyp (base-url page))
-                                           `(:relative ,@(split "/" (base-url page)))
-                                           nil)
-                            :name "index"
-                            :type "html")
-             (cl-fad:pathname-as-file
-              (make-pathname :directory `(:relative ,@(split "/" (base-url page))))))))
-    (merge-pathnames relative-path (acceptor-document-root (acceptor page)))))
+          (if (ends-with #\/ (base-url page))
+              (make-pathname :directory (if (emptyp (base-url page))
+                                            `(:relative ,@(split "/" (base-url page)))
+                                            nil)
+                             :name "index"
+                             :type "html")
+              (cl-fad:pathname-as-file
+               (make-pathname :directory `(:relative ,@(split "/" (base-url page))))))))
+    (merge-pathnames relative-path (acceptor-document-root (acceptor (webapp page))))))
 
 
 
