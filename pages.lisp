@@ -175,9 +175,9 @@
 
 (defmethod handler ((page dynamic-page) &key)
   (lambda ()
-    (let ((*webapp* (webapp page))
-          (*page* page)
-          (*parameters* (parse-parameters page)))
+    (let* ((*webapp* (webapp page))
+           (*page* page)
+           (*parameters* (parse-parameters page)))
       (with-output-to-string (*standard-output*)
         (apply (body page) *parameters*)))))
 

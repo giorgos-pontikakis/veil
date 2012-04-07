@@ -38,6 +38,8 @@
    :define-webapp
    :find-webapp
    :register-webapp
+   :start-webapp
+   :stop-webapp
    :package-webapp
    :default-webapp
    ;; page class
