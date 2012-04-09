@@ -239,9 +239,9 @@
 
 (defmethod handler ((page regex-page) &key register-values)
   (lambda ()
-    (let ((*webapp* (webapp page))
-          (*page* page)
-          (*parameters* (parse-parameters page)))
+    (let* ((*webapp* (webapp page))
+           (*page* page)
+           (*parameters* (parse-parameters page)))
       (with-output-to-string (*standard-output*)
         (apply (body page)
                (append *parameters* register-values))))))
