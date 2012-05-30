@@ -190,6 +190,8 @@
 (defclass regex-page (dynamic-page)
   ((scanner :reader scanner)))
 
+(defparameter *registers* nil)
+
 (defmethod register-page :after ((page regex-page) webapp)
   (let ((scanner (with-output-to-string (stream)
                    ;; web root
@@ -241,7 +243,8 @@
   (lambda ()
     (let* ((*webapp* (webapp page))
            (*page* page)
-           (*parameters* (parse-parameters page)))
+           (*parameters* (parse-parameters page))
+           (*registers* register-values))
       (with-output-to-string (*standard-output*)
         (apply (body page)
                (append *parameters* register-values))))))

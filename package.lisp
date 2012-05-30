@@ -13,6 +13,7 @@
    :*webapp*
    :*page*
    :*parameters*
+   :*registers*
    ;; Constants
    :+urlenc-true+
    :+urlenc-false+
