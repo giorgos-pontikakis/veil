@@ -62,6 +62,7 @@
    :publisher
    :register-names
    ;; page functions
+   :page
    :dynamic-page
    :regex-page
    :static-page
