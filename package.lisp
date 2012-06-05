@@ -23,7 +23,6 @@
    :veil-ssl-acceptor
    ;; webapp class
    :packages
-   :db-connection-spec
    :pages
    :fs-root
    :fs-paths

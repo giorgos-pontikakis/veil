@@ -22,7 +22,6 @@
 
 (defclass webapp ()
   ((webapp-name        :accessor webapp-name        :initarg  :webapp-name)
-   (db-connection-spec :accessor db-connection-spec :initarg  :db-connection-spec)
    (fs-root            :accessor fs-root            :initarg  :fs-root)
    (fs-paths           :accessor fs-paths           :initarg  :fs-paths)
    (web-root           :accessor web-root           :initarg  :web-root)
