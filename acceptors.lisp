@@ -69,14 +69,14 @@
 hash table as the dispatch table of the veil-acceptor, instead of
 the *dispatch-table* list."
   (iter app-loop
-    (for app in (webapps *acceptor*))
-    (iter dispatcher-loop
-      (for (nil . dispatcher) in (dispatch-table app))
-      (for action = (funcall dispatcher request))
-      (when action
-        (return-from app-loop (funcall action))))
-    (finally (setf (return-code* *reply*)
-                   +http-not-found+))))
+        (for app in (webapps *acceptor*))
+        (iter dispatcher-loop
+              (for (nil . dispatcher) in (dispatch-table app))
+              (for action = (funcall dispatcher request))
+              (when action
+                (return-from app-loop (funcall action))))
+        (finally (setf (return-code* *reply*)
+                       +http-not-found+))))
 
 
 
