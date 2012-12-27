@@ -168,8 +168,10 @@
 
 (defmethod dispatcher ((page dynamic-page))
   (lambda (request)
-    (if (string= (full-base-url page)
-                 (script-name request))
+    (if (and (string= (full-base-url page)
+                      (script-name request))
+             (eql (request-method* request)
+                  (request-type page)))
         (handler page)
         nil)))
 
@@ -235,7 +237,9 @@
   (lambda (request)
     (multiple-value-bind (match regs) (scan-to-strings (scanner page)
                                                        (script-name request))
-      (if match
+      (if (and match
+               (eql (request-method* request)
+                    (request-type page)))
           (handler page :register-values (coerce regs 'list))
           nil))))
 
@@ -264,8 +268,10 @@
 
 (defmethod dispatcher ((page static-page))
   (lambda (request)
-    (if (string= (full-base-url page)
-                 (script-name request))
+    (if (and (string= (full-base-url page)
+                      (script-name request))
+             (eql (request-method* request)
+                  (request-type page)))
         (handle-static-file (location page) (content-type page))
         nil)))
 
@@ -290,26 +296,24 @@
 ;;; DEFPAGE macro
 ;;; ------------------------------------------------------------
 
-(defmacro defpage (page-class page-name (base-url &rest initargs)
+(defmacro defpage (page-class page-name (base-url &rest initargs
+                                                  &key request-type content-type webapp-name &allow-other-keys)
                    (&rest parameter-specs) &body body)
   (with-gensyms (webapp page)
     (let ((parameter-names (parameter-names parameter-specs))
-          (register-names (register-names base-url))
-          (webapp-name (getf initargs :webapp-name)))
+          (register-names (register-names base-url)))
       `(let* ((,webapp (or (find-webapp ',webapp-name) (default-webapp)))
               (,page (make-instance ',page-class
                                     :page-name ',page-name
                                     :base-url ',base-url
-                                    :content-type ,(getf initargs :content-type
-                                                         *default-content-type*)
-                                    :request-type ,(getf initargs :request-type :get)
+                                    :content-type ,(or content-type *default-content-type*)
+                                    :request-type ,(or request-type :get)
                                     :parameter-specs ',parameter-specs
                                     :body (lambda (,@parameter-names ,@register-names)
                                             (declare (ignorable ,@parameter-names ,@register-names))
                                             ,@body)
                                     ,@(remove-from-plist initargs
-                                                         :content-type :request-type
-                                                         :webapp-name))))
+                                                         :content-type :request-type :webapp-name))))
          (register-page ,page ,webapp)
          (publish-page ,page ,webapp)
          (define-page-function ,webapp-name ,page-name ,register-names ,parameter-names)))))
