@@ -19,12 +19,14 @@
           (split "&" string)))
 
 (defun princ-http-query (page parameters &optional (stream *standard-output*))
-  (loop for key in (mapcar #'parameter-key (parameter-attributes page))
+  (loop with delimiter = #\?
+        for name in (parameter-names page)
         for val in parameters
-        for delimiter = #\? then #\&
         when val
         do
            (princ delimiter stream)
-           (princ (string-downcase key) stream)
+           (when (char= delimiter #\?)
+             (setf delimiter #\&))
+           (princ name stream)
            (princ #\= stream)
            (princ (lisp->urlenc val) stream)))

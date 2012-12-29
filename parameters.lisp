@@ -160,7 +160,7 @@
                                                (parse-query-string query-string)))))
     (let ((parameters
             (loop for attr in (parameter-attributes page)
-                  for raw = (cdr (assoc (string-downcase (parameter-name attr))
+                  for raw = (cdr (assoc (parameter-name attr)
                                         query-alist
                                         :test #'string-equal))
                   collect (parse-parameter attr raw))))

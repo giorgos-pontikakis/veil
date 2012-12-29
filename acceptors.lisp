@@ -83,7 +83,7 @@ the *dispatch-table* list."
 ;; Webapp functions
 ;; ----------------------------------------------------------------------
 
-(defparameter *webapps* nil)
+(defvar *webapps* nil)
 
 (defparameter *webapp* nil) ;; The webapp of the page that *acceptor* dispatches
 

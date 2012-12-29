@@ -60,7 +60,8 @@
   parameter names as a list of symbols."))
 
 (defmethod parameter-names ((obj page))
-  (mapcar #'parameter-name (parameter-attributes obj)))
+  (mapcar (compose #'string-downcase #'parameter-name)
+          (parameter-attributes obj)))
 
 (defmethod parameter-names ((obj list))
   (mapcar (lambda (item)
