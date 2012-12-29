@@ -121,10 +121,10 @@
   (values))
 
 (defun build-pages (&optional (webapp (default-webapp)))
-  (iter (for (nil page) in-hashtable (pages webapp))
-        (when (eql (type-of page) 'static-page)
-          (build-page page)
-          (collect (page-name page)))))
+  (loop for page being the hash-values of (pages webapp)
+        when (eql (type-of page) 'static-page)
+        do (build-page page)
+        collect (page-name page)))
 
 
 ;; -- Publish --
@@ -154,8 +154,8 @@
 ;; -- Published pages --
 
 (defun published-pages (&optional (webapp (default-webapp)))
-  (iter (for (page-name . nil) in (dispatch-table webapp))
-        (collect page-name)))
+  (loop for (page-name . nil) in (dispatch-table webapp)
+        collect page-name))
 
 
 

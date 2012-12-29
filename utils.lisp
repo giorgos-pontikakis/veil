@@ -1,13 +1,13 @@
 (in-package :veil)
 
 (defun group-duplicate-keys (alist &key (test #'eql))
-  (iter (with result)
-        (for (key . value) in alist)
-        (let ((old (assoc key result :test test)))
-          (if old
-              (rplacd old (list (cdr old) value))
-              (push (cons key value) result)))
-        (finally (return result))))
+  (loop with result
+        for (key . value) in alist
+        for old = (assoc key result :test test)
+        do (if old
+               (rplacd old (list (cdr old) value))
+               (push (cons key value) result))
+        finally (return result)))
 
 (defun parse-query-string (string)
   ;; Return alist with keys as string. This simulates hunchentoot's
@@ -19,10 +19,11 @@
           (split "&" string)))
 
 (defun princ-http-query (page parameters &optional (stream *standard-output*))
-  (iter (for key in (mapcar #'parameter-key (parameter-attributes page)))
-        (for val in parameters)
-        (when val
-          (princ (if (first-time-p) #\? #\&) stream)
-          (princ (string-downcase key) stream)
-          (princ #\= stream)
-          (princ (lisp->urlenc val) stream))))
+  (loop for key in (mapcar #'parameter-key (parameter-attributes page))
+        for val in parameters
+        when val
+        do
+           (princ (if (first-time-p) #\? #\&) stream)
+           (princ (string-downcase key) stream)
+           (princ #\= stream)
+           (princ (lisp->urlenc val) stream)))

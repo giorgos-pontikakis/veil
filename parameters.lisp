@@ -138,8 +138,8 @@
 
 (defun validate-parameter (p parameters)
   (flet ((find-parameters (names)
-           (iter (for n in names)
-                 (collect (find-parameter n parameters)))))
+           (loop for n in names
+                 collect (find-parameter n parameters))))
     (let* ((attr (attributes p))
            (pargs (find-parameters (vargs attr))))
       (when (and (every #'suppliedp pargs)
@@ -159,11 +159,11 @@
                                                ;; useful for debugging
                                                (parse-query-string query-string)))))
     (let ((parameters
-            (iter (for attr in (parameter-attributes page))
-                  (for raw = (cdr (assoc (string-downcase (parameter-name attr))
-                                         query-alist
-                                         :test #'string-equal)))
-                  (collect (parse-parameter attr raw)))))
+            (loop for attr in (parameter-attributes page)
+                  for raw = (cdr (assoc (string-downcase (parameter-name attr))
+                                        query-alist
+                                        :test #'string-equal))
+                  collect (parse-parameter attr raw))))
       (dolist (p parameters)
         (validate-parameter p parameters))
       parameters)))

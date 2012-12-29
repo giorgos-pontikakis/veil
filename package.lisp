@@ -2,7 +2,6 @@
 
 (defpackage :veil
   (:use "COMMON-LISP"
-        "ITERATE"
         "ALEXANDRIA"
         "HUNCHENTOOT"
         "CL-PPCRE"
