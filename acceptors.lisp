@@ -73,7 +73,7 @@ the *dispatch-table* list."
         do (loop for (nil . dispatcher) in (dispatch-table app)
                  for action = (funcall dispatcher request)
                  when action
-                 do (return-from app-loop (funcall action)))
+                   do (return-from app-loop (funcall action)))
         finally (setf (return-code* *reply*)
                       +http-not-found+)))
 

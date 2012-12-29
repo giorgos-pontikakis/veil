@@ -23,10 +23,9 @@
         for name in (parameter-names page)
         for val in parameters
         when val
-        do
-           (princ delimiter stream)
-           (when (char= delimiter #\?)
-             (setf delimiter #\&))
-           (princ name stream)
-           (princ #\= stream)
-           (princ (lisp->urlenc val) stream)))
+          do (princ delimiter stream)
+             (when (char= delimiter #\?)
+               (setf delimiter #\&))
+             (princ name stream)
+             (princ #\= stream)
+             (princ (lisp->urlenc val) stream)))

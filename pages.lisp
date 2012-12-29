@@ -124,7 +124,7 @@
 (defun build-pages (&optional (webapp (default-webapp)))
   (loop for page being the hash-values of (pages webapp)
         when (eql (type-of page) 'static-page)
-        do (build-page page)
+          do (build-page page)
         collect (page-name page)))
 
 
@@ -298,7 +298,8 @@
 ;;; ------------------------------------------------------------
 
 (defmacro defpage (page-class page-name (base-url &rest initargs
-                                                  &key request-type content-type webapp-name &allow-other-keys)
+                                                  &key request-type content-type webapp-name
+                                                  &allow-other-keys)
                    (&rest parameter-specs) &body body)
   (with-gensyms (webapp page)
     (let ((parameter-names (parameter-names parameter-specs))
