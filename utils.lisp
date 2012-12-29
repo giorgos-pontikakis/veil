@@ -21,9 +21,10 @@
 (defun princ-http-query (page parameters &optional (stream *standard-output*))
   (loop for key in (mapcar #'parameter-key (parameter-attributes page))
         for val in parameters
+        for delimiter = #\? then #\&
         when val
         do
-           (princ (if (first-time-p) #\? #\&) stream)
+           (princ delimiter stream)
            (princ (string-downcase key) stream)
            (princ #\= stream)
            (princ (lisp->urlenc val) stream)))
