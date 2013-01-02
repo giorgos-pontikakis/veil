@@ -4,8 +4,7 @@
 
 (asdf:defsystem :veil
   :serial t
-  :depends-on (:iterate
-               :alexandria
+  :depends-on (:alexandria
                :hunchentoot
                :cl-ppcre
                :lisputils)
