@@ -176,9 +176,8 @@
 
 (defun validate-parameters (chk-fn &rest parameters)
   "A posteriori parameter validation"
-  (when (and (some #'suppliedp parameters)
-             (every #'validp parameters))
-    (when-let (error-type (apply chk-fn (mapcar #'val parameters)))
+  (when (every #'validp parameters)
+    (when-let (error-type (apply chk-fn parameters))
       (mapc (lambda (p)
               (setf (val p) nil)
               (setf (validp p) nil)
