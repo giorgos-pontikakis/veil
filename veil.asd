@@ -1,8 +1,14 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: CL-USER; Base: 10 -*-
 
-(in-package :cl)
+(in-package :cl-user)
 
-(asdf:defsystem :veil
+(defpackage :veil-asdf
+    (:use :cl :asdf))
+
+(in-package :veil-asdf)
+
+(defsystem :veil
+  :version "1.0.0"
   :serial t
   :depends-on (:alexandria
                :hunchentoot
