@@ -10,10 +10,12 @@
 (defsystem :veil
   :version "1.0.0"
   :serial t
+  ;;
   :depends-on (:alexandria
                :hunchentoot
                :cl-ppcre
-               :lisputils)
+               (:version :lisputils "1.0.0"))
+  ;;
   :components ((:file "package")
                (:file "utils")
                (:file "acceptors")
