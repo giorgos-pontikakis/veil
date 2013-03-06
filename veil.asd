@@ -3,7 +3,7 @@
 (in-package :cl-user)
 
 (defpackage :veil-asdf
-    (:use :cl :asdf))
+  (:use :cl :asdf))
 
 (in-package :veil-asdf)
 
