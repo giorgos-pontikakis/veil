@@ -181,8 +181,7 @@
     (let* ((*webapp* (webapp page))
            (*page* page)
            (*parameters* (parse-parameters page)))
-      (with-output-to-string (*standard-output*)
-        (apply (body page) *parameters*)))))
+      (apply (body page) *parameters*))))
 
 
 
