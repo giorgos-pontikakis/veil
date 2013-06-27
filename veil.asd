@@ -8,13 +8,13 @@
 (in-package :veil-asdf)
 
 (defsystem :veil
-  :version "1.0.0"
+  :version "1.1.0"
   :serial t
   ;;
   :depends-on (:alexandria
                :hunchentoot
                :cl-ppcre
-               (:version :lisputils "1.0.0"))
+               (:version :lisputils "1.1.0"))
   ;;
   :components ((:file "package")
                (:file "utils")
